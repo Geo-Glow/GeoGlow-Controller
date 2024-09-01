@@ -7,8 +7,11 @@ const size_t CONFIG_JSON_SIZE = 1024;
 const int MDNS_RETRIES = 5; // Number of times to retry mDNS query
 const int MDNS_RETRY_DELAY = 2000; // Delay between retries in milliseconds
 
+// Wifi Creds
+char wifiSSID[40] = "";
+char wifiPassword[40] = "";
+
 // Global Variables
-WiFiManager wifiManager;
 WiFiClient wifiClient;
 MQTTClient mqttClient(wifiClient);
 NanoleafApiWrapper nanoleaf(wifiClient);
@@ -37,7 +40,20 @@ void setup() {
 
     initializeUUID();
     loadConfigFromFile();
-    setupWiFiManager();
+
+    // Prompt for WiFi credentials
+    if (strlen(wifiSSID) == 0 || strlen(wifiPassword) == 0) {
+        Serial.println("Please enter WiFi credentials.");
+        Serial.println("SSID: ");
+    } else {
+        WiFi.begin(wifiSSID, wifiPassword);
+        while (WiFi.status() != WL_CONNECTED) {
+            delay(500);
+            Serial.print(".");
+        }
+        Serial.println("Connected to WiFi");
+    }
+
     generateMDNSNanoleafURL(); // Always generate MDNS Nanoleaf URL
     setupMQTTClient();
     attemptNanoleafConnection();
@@ -48,7 +64,42 @@ void setup() {
 }
 
 void loop() {
+    static String inputString = "";
+    static int inputState = 0; // 0: Waiting for SSID, 1: Waiting for Password
+
     mqttClient.loop();
+
+    if (Serial.available()) {
+        char inChar = (char)Serial.read();
+        if (inChar == "\n") {
+            if (inputState == 0) {
+                strcpy(wifiSSID, inputString.c_str());
+                Serial.println("Password: ");
+                inputState = 1;
+            } else if (inputState == 1) {
+                strcpy(wifiPassword, inputString.c_str());
+
+                saveConfigToFile();
+
+                WiFi.begin(wifiSSID, wifiPassword);
+                while (WiFi.status() != WL_CONNECTED) {
+                    delay(500);
+                    Serial.print(".");
+                }
+                Serial.println("Connected to WiFi");
+
+                // Proceed to other setup steps
+                generateMDNSNanoleafURL();
+                setupMQTTClient();
+                attemptNanoleafConnection();
+
+                inputState = 0;
+            }
+            inputString = "";
+        } else {
+            inputString += inChar;
+        }
+    }
 
     if (millis() - lastPublishTime >= PUBLISH_INTERVAL) {
         publishStatus();
@@ -96,6 +147,10 @@ void loadConfigFromFile() {
     strcpy(nanoleafAuthToken, jsonConfig["nanoleafAuthToken"]);
     strcpy(deviceId, jsonConfig["deviceId"]);
     strcpy(friendId, jsonConfig["friendId"]);
+
+    // Load WiFi credentials
+    strcpy(wifiSSID, jsonConfig["wifiSSID"]);
+    strcpy(wifiPassword, jsonConfig["wifiPassword"]);
 
     configFile.close();
     Serial.println("Parsed JSON config");
@@ -149,6 +204,10 @@ void saveConfigToFile() {
     jsonConfig["friendId"] = friendId;
     jsonConfig["deviceId"] = deviceId;
 
+    // Save WiFi credentials
+    jsonConfig["wifiSSID"] = wifiSSID;
+    jsonConfig["wifiPassword"] = wifiPassword;
+
     serializeJson(jsonConfig, configFile);
     configFile.close();
     Serial.println("Config saved successfully");
@@ -172,33 +231,6 @@ void attemptNanoleafConnection() {
     }
 
     Serial.println("Nanoleaf connected");
-}
-
-void setupWiFiManager() {
-    WiFiManagerParameter customMqttBroker("mqttBroker", "MQTT Broker", mqttBroker, 40);
-    WiFiManagerParameter customMqttPort("mqttPort", "MQTT Port", mqttPort, 6);
-    WiFiManagerParameter customFriendId("friendId", "Friend ID", friendId, 36);
-
-    wifiManager.setSaveConfigCallback(saveConfigCallback);
-    wifiManager.addParameter(&customMqttBroker);
-    wifiManager.addParameter(&customMqttPort);
-    wifiManager.addParameter(&customFriendId);
-
-    if (!wifiManager.autoConnect("GeoGlow")) {
-        Serial.println("Failed to connect and hit timeout");
-        delay(3000);
-        ESP.restart();
-        delay(5000);
-    }
-
-    Serial.println("Connected");
-
-    strcpy(mqttBroker, customMqttBroker.getValue());
-    strcpy(mqttPort, customMqttPort.getValue());
-    strcpy(friendId, customFriendId.getValue());
-
-    if (strlen(friendId) >= sizeof(friendId) - 1) friendId[sizeof(friendId) - 1] = '\0';
-    if (strlen(deviceId) >= sizeof(deviceId) - 1) deviceId[sizeof(deviceId) - 1] = '\0';
 }
 
 void setupMQTTClient() {

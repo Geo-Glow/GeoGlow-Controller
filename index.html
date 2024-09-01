@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ESP Web Tools</title>
+    <script
+      type="module"
+      src="https://unpkg.com/esp-web-tools@8.0.0/dist/esp-web-tools.js"
+    ></script>
+    <script
+      type="module"
+      src="https://unpkg.com/esp-web-tools@8.0.0/dist/components/espweb-terminal.js"
+    ></script>
+  </head>
+  <body>
+    <h1>Upload Firmware and Configure Your ESP</h1>
+    <esp-web-install-button manifest="./manifest.json"></esp-web-install-button>
+    <h2>Terminal for Configuration</h2>
+    <esp-web-terminal></esp-web-terminal>
+  </body>
+</html>

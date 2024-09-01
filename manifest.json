@@ -1,0 +1,20 @@
+{
+    "manifest": {
+        "application": {
+            "name": "GeoGlow ESP Firmware",
+            "email": "ncrisci@th-koeln.de"
+        }
+    },
+    "builds": [
+        {
+            "chipFamily": "ESP8266",
+            "improv": true,
+            "parts": [
+                {
+                    "path": "firmware/firmware.bin",
+                    "offset": 0
+                }
+            ]
+        }
+    ]
+}
