@@ -1,20 +1,21 @@
 #include "GeoGlowTileController.h"
 
+// Constants
 const unsigned long PUBLISH_INTERVAL = 30000;
 const char* CONFIG_FILE = "/config.json";
 const size_t CONFIG_JSON_SIZE = 1024;
-const int MDNS_RETRIES = 5;
-const int MDNS_RETRY_DELAY = 2000;
+const int MDNS_RETRIES = 5; // Number of times to retry mDNS query
+const int MDNS_RETRY_DELAY = 2000; // Delay between retries in milliseconds
 
-char wifiSSID[40] = "";
-char wifiPassword[40] = "";
-
+// Global Variables
+WiFiManager wifiManager;
 WiFiClient wifiClient;
 MQTTClient mqttClient(wifiClient);
 NanoleafApiWrapper nanoleaf(wifiClient);
 ColorPaletteAdapter colorPaletteAdapter(nanoleaf);
 
 unsigned long lastPublishTime = 0;
+
 char mqttBroker[40];
 char mqttPort[6] = "1883";
 char nanoleafBaseUrl[55] = "";
@@ -24,19 +25,22 @@ char deviceId[36] = "";
 
 bool shouldSaveConfig = false;
 
+// Function Definitions
+void saveConfigCallback() {
+    Serial.println("Should save config");
+    shouldSaveConfig = true;
+}
+
 void setup() {
     Serial.begin(115200);
     delay(10);
 
     initializeUUID();
     loadConfigFromFile();
-
-    if (strlen(wifiSSID) == 0 || strlen(wifiPassword) == 0) {
-        Serial.println("Please enter WiFi credentials.");
-        promptForCredentials();
-    } else {
-        connectToWiFi();
-    }
+    setupWiFiManager();
+    generateMDNSNanoleafURL(); // Always generate MDNS Nanoleaf URL
+    setupMQTTClient();
+    attemptNanoleafConnection();
 
     if (shouldSaveConfig) {
         saveConfigToFile();
@@ -44,67 +48,12 @@ void setup() {
 }
 
 void loop() {
-    static String inputString = "";
-    static int inputState = 0;
-
     mqttClient.loop();
 
-    if (Serial.available()) {
-        char inChar = (char)Serial.read();
-        if (inChar == '\n') {
-            if (inputState == 0) {
-                strcpy(wifiSSID, inputString.c_str());
-                Serial.println("Password: ");
-                inputState = 1;
-            } else if (inputState == 1) {
-                strcpy(wifiPassword, inputString.c_str());
-                saveConfigToFile();
-                connectToWiFi();
-                inputState = 0;
-            }
-            inputString = "";
-        } else {
-            inputString += inChar;
-        }
+    if (millis() - lastPublishTime >= PUBLISH_INTERVAL) {
+        publishStatus();
+        lastPublishTime = millis();
     }
-
-    if (WiFi.status() == WL_CONNECTED) {
-        if (millis() - lastPublishTime >= PUBLISH_INTERVAL) {
-            publishStatus();
-            lastPublishTime = millis();
-        }
-    }
-}
-
-void promptForCredentials() {
-    Serial.println("SSID: ");
-    while (strlen(wifiSSID) == 0 || strlen(wifiPassword) == 0) {
-        if (Serial.available()) {
-            String input = Serial.readStringUntil('\n');
-            if (strlen(wifiSSID) == 0) {
-                input.trim();
-                strncpy(wifiSSID, input.c_str(), sizeof(wifiSSID) - 1);
-                Serial.println("Password: ");
-            } else if (strlen(wifiPassword) == 0) {
-                input.trim();
-                strncpy(wifiPassword, input.c_str(), sizeof(wifiPassword) - 1);
-                saveConfigToFile();
-                connectToWiFi();
-            }
-        }
-    }
-}
-
-void connectToWiFi() {
-    WiFi.begin(wifiSSID, wifiPassword);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println("\nConnected to WiFi");
-    generateMDNSNanoleafURL();
-    setupMQTTClient();
-    attemptNanoleafConnection();
 }
 
 void initializeUUID() {
@@ -147,10 +96,6 @@ void loadConfigFromFile() {
     strcpy(nanoleafAuthToken, jsonConfig["nanoleafAuthToken"]);
     strcpy(deviceId, jsonConfig["deviceId"]);
     strcpy(friendId, jsonConfig["friendId"]);
-
-    // Load WiFi credentials
-    strcpy(wifiSSID, jsonConfig["wifiSSID"]);
-    strcpy(wifiPassword, jsonConfig["wifiPassword"]);
 
     configFile.close();
     Serial.println("Parsed JSON config");
@@ -204,10 +149,6 @@ void saveConfigToFile() {
     jsonConfig["friendId"] = friendId;
     jsonConfig["deviceId"] = deviceId;
 
-    // Save WiFi credentials
-    jsonConfig["wifiSSID"] = wifiSSID;
-    jsonConfig["wifiPassword"] = wifiPassword;
-
     serializeJson(jsonConfig, configFile);
     configFile.close();
     Serial.println("Config saved successfully");
@@ -231,6 +172,33 @@ void attemptNanoleafConnection() {
     }
 
     Serial.println("Nanoleaf connected");
+}
+
+void setupWiFiManager() {
+    WiFiManagerParameter customMqttBroker("mqttBroker", "MQTT Broker", mqttBroker, 40);
+    WiFiManagerParameter customMqttPort("mqttPort", "MQTT Port", mqttPort, 6);
+    WiFiManagerParameter customFriendId("friendId", "Friend ID", friendId, 36);
+
+    wifiManager.setSaveConfigCallback(saveConfigCallback);
+    wifiManager.addParameter(&customMqttBroker);
+    wifiManager.addParameter(&customMqttPort);
+    wifiManager.addParameter(&customFriendId);
+
+    if (!wifiManager.autoConnect("GeoGlow")) {
+        Serial.println("Failed to connect and hit timeout");
+        delay(3000);
+        ESP.restart();
+        delay(5000);
+    }
+
+    Serial.println("Connected");
+
+    strcpy(mqttBroker, customMqttBroker.getValue());
+    strcpy(mqttPort, customMqttPort.getValue());
+    strcpy(friendId, customFriendId.getValue());
+
+    if (strlen(friendId) >= sizeof(friendId) - 1) friendId[sizeof(friendId) - 1] = '\0';
+    if (strlen(deviceId) >= sizeof(deviceId) - 1) deviceId[sizeof(deviceId) - 1] = '\0';
 }
 
 void setupMQTTClient() {
