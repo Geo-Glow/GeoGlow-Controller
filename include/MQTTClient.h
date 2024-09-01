@@ -22,16 +22,19 @@ public:
 private:
     void reconnect();
 
-    char *buildTopic(const TopicAdapter *adapter) const;
+    String buildTopic(const TopicAdapter *adapter) const;
 
-    void callback(char *topic, const byte *payload, unsigned int length) const;
+    static void staticCallback(char *topic, byte *payload, unsigned int length);
 
-    static bool matches(const char *subscribedTopic, const char *receivedTopic);
+    void callback(char *topic, byte *payload, unsigned int length);
+
+    static bool matches(const String &subscribedTopic, const String &receivedTopic);
 
     PubSubClient client;
-    const char *friendId{};
-    const char *deviceId{};
+    String friendId;
+    String deviceId;
     static std::vector<TopicAdapter *> topicAdapters;
+    static MQTTClient* instance;
 };
 
-#endif
+#endif // MQTTCLIENT_H

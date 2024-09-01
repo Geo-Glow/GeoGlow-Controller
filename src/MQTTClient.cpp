@@ -1,6 +1,7 @@
 #include "MQTTClient.h"
 
 std::vector<TopicAdapter *> MQTTClient::topicAdapters;
+MQTTClient* MQTTClient::instance = nullptr;
 
 MQTTClient::MQTTClient(WiFiClient &wifiClient)
     : client(wifiClient) {
@@ -9,13 +10,12 @@ MQTTClient::MQTTClient(WiFiClient &wifiClient)
 void MQTTClient::setup(const char *mqttBroker, const int mqttPort, const char *friendId, const char *deviceId) {
     client.setServer(mqttBroker, mqttPort);
 
-    auto callback = [this](char *topic, const byte *payload, const unsigned int length) {
-        this->callback(topic, payload, length);
-    };
+    // Assign this instance to the static instance pointer
+    instance = this;
 
-    std::function<void(char *, uint8_t *, unsigned int)> function = callback;
+    // Set the static callback
+    client.setCallback(staticCallback);
 
-    client.setCallback(callback);
     client.setBufferSize(2048);
 
     this->friendId = friendId;
@@ -32,11 +32,11 @@ void MQTTClient::loop() {
 void MQTTClient::reconnect() {
     while (!client.connected()) {
         Serial.print("Attempting MQTT connection...");
-        auto mqttClientId = "GeoGlow-" + String(this->friendId) + "-" + String(this->deviceId);
+        String mqttClientId = "GeoGlow-" + this->friendId + "-" + this->deviceId;
         if (client.connect(mqttClientId.c_str())) {
             Serial.println("connected: " + mqttClientId);
             for (const auto adapter: topicAdapters) {
-                client.subscribe(buildTopic(adapter));
+                client.subscribe(buildTopic(adapter).c_str());
             }
         } else {
             Serial.print("failed, rc=");
@@ -50,60 +50,52 @@ void MQTTClient::reconnect() {
 void MQTTClient::publish(const char *topic, const JsonDocument &jsonPayload) {
     if (client.connected()) {
         char buffer[512];
-        const size_t n = serializeJson(jsonPayload, buffer);
+        size_t n = serializeJson(jsonPayload, buffer);
         client.publish(topic, buffer, n);
     } else {
         Serial.println("MQTT client not connected. Unable to publish message.");
     }
 }
 
-char *MQTTClient::buildTopic(const TopicAdapter *adapter) const {
-    const size_t topicLength = strlen("GeoGlow/") +
-                               strlen(friendId) + 1 +
-                               strlen(deviceId) + 1 +
-                               strlen(adapter->getTopic()) + 1;
-
-    const auto topic = static_cast<char *>(malloc(topicLength));
-
-    if (topic == nullptr) {
-        return nullptr;
-    }
-
-    strcpy(topic, "GeoGlow/");
-    strcat(topic, friendId);
-    strcat(topic, "/");
-    strcat(topic, deviceId);
-    strcat(topic, "/");
-    strcat(topic, adapter->getTopic());
-
+String MQTTClient::buildTopic(const TopicAdapter *adapter) const {
+    String topic = "GeoGlow/";
+    topic += friendId + "/";
+    topic += deviceId + "/";
+    topic += adapter->getTopic();
     return topic;
 }
-
 
 void MQTTClient::addTopicAdapter(TopicAdapter *adapter) {
     topicAdapters.push_back(adapter);
     if (client.connected()) {
-        client.subscribe(buildTopic(adapter));
+        client.subscribe(buildTopic(adapter).c_str());
     }
 }
 
-void MQTTClient::callback(char *topic, const byte *payload, const unsigned int length) const {
+void MQTTClient::staticCallback(char *topic, byte *payload, unsigned int length) {
+    // Use the static instance pointer to call the instance method
+    if (instance) {
+        instance->callback(topic, payload, length);
+    }
+}
+
+void MQTTClient::callback(char *topic, byte *payload, unsigned int length) {
     char payloadBuffer[length + 1];
     memcpy(payloadBuffer, payload, length);
     payloadBuffer[length] = '\0';
 
-    JsonDocument jsonDocument;
-
-    if (deserializeJson(jsonDocument, payloadBuffer)) {
-        Serial.print("Unhandled message [");
-        Serial.print(topic);
-        Serial.print("] ");
-        Serial.println(payloadBuffer);
+    DynamicJsonDocument jsonDocument(1024);
+    
+    DeserializationError error = deserializeJson(jsonDocument, payloadBuffer);
+    if (error) {
+        Serial.print("Failed to parse JSON payload: ");
+        Serial.println(error.c_str());
         return;
     }
 
+    String receivedTopic = String(topic);
     for (const auto adapter: topicAdapters) {
-        if (matches(buildTopic(adapter), topic)) {
+        if (matches(buildTopic(adapter), receivedTopic)) {
             adapter->callback(topic, jsonDocument.as<JsonObject>(), length);
             return;
         }
@@ -115,26 +107,17 @@ void MQTTClient::callback(char *topic, const byte *payload, const unsigned int l
     Serial.println(payloadBuffer);
 }
 
-bool MQTTClient::matches(const char *subscribedTopic, const char *receivedTopic) {
-    if (const char *wildCardPos = strchr(subscribedTopic, '#'); wildCardPos != nullptr) {
-        if (wildCardPos[1] == '\0') {
-            size_t subscribedTopicLength = wildCardPos - subscribedTopic;
-            if (subscribedTopicLength > 0 && subscribedTopic[subscribedTopicLength - 1] == '/') {
-                subscribedTopicLength--;
-            }
-            return strncmp(subscribedTopic, receivedTopic, subscribedTopicLength) == 0;
-        }
-        return false;
-    }
-
-    if (const char *plusPos = strchr(subscribedTopic, '+'); plusPos != nullptr) {
-        const char *slashPos = strchr(receivedTopic, '/');
-        if (slashPos == nullptr) {
+bool MQTTClient::matches(const String &subscribedTopic, const String &receivedTopic) {
+    if (subscribedTopic.endsWith("#")) {
+        String baseTopic = subscribedTopic.substring(0, subscribedTopic.length() - 1);
+        return receivedTopic.startsWith(baseTopic);
+    } else if (subscribedTopic.indexOf('+') >= 0) {
+        int plusPos = subscribedTopic.indexOf('+');
+        String preWildcard = subscribedTopic.substring(0, plusPos);
+        String postWildcard = subscribedTopic.substring(plusPos + 1);
+        if (receivedTopic.startsWith(preWildcard) && receivedTopic.endsWith(postWildcard)) {
             return true;
         }
-        return strncmp(subscribedTopic, receivedTopic, plusPos - subscribedTopic) == 0 &&
-               strcmp(plusPos + 1, slashPos + 1) == 0;
     }
-
-    return strcmp(subscribedTopic, receivedTopic) == 0;
+    return subscribedTopic == receivedTopic;
 }
