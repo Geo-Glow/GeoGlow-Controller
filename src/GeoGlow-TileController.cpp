@@ -1,24 +1,20 @@
 #include "GeoGlowTileController.h"
 
-// Constants
 const unsigned long PUBLISH_INTERVAL = 30000;
 const char* CONFIG_FILE = "/config.json";
 const size_t CONFIG_JSON_SIZE = 1024;
-const int MDNS_RETRIES = 5; // Number of times to retry mDNS query
-const int MDNS_RETRY_DELAY = 2000; // Delay between retries in milliseconds
+const int MDNS_RETRIES = 5;
+const int MDNS_RETRY_DELAY = 2000;
 
-// Wifi Creds
 char wifiSSID[40] = "";
 char wifiPassword[40] = "";
 
-// Global Variables
 WiFiClient wifiClient;
 MQTTClient mqttClient(wifiClient);
 NanoleafApiWrapper nanoleaf(wifiClient);
 ColorPaletteAdapter colorPaletteAdapter(nanoleaf);
 
 unsigned long lastPublishTime = 0;
-
 char mqttBroker[40];
 char mqttPort[6] = "1883";
 char nanoleafBaseUrl[55] = "";
@@ -28,12 +24,6 @@ char deviceId[36] = "";
 
 bool shouldSaveConfig = false;
 
-// Function Definitions
-void saveConfigCallback() {
-    Serial.println("Should save config");
-    shouldSaveConfig = true;
-}
-
 void setup() {
     Serial.begin(115200);
     delay(10);
@@ -41,22 +31,12 @@ void setup() {
     initializeUUID();
     loadConfigFromFile();
 
-    // Prompt for WiFi credentials
     if (strlen(wifiSSID) == 0 || strlen(wifiPassword) == 0) {
         Serial.println("Please enter WiFi credentials.");
-        Serial.println("SSID: ");
+        promptForCredentials();
     } else {
-        WiFi.begin(wifiSSID, wifiPassword);
-        while (WiFi.status() != WL_CONNECTED) {
-            delay(500);
-            Serial.print(".");
-        }
-        Serial.println("Connected to WiFi");
+        connectToWiFi();
     }
-
-    generateMDNSNanoleafURL(); // Always generate MDNS Nanoleaf URL
-    setupMQTTClient();
-    attemptNanoleafConnection();
 
     if (shouldSaveConfig) {
         saveConfigToFile();
@@ -65,7 +45,7 @@ void setup() {
 
 void loop() {
     static String inputString = "";
-    static int inputState = 0; // 0: Waiting for SSID, 1: Waiting for Password
+    static int inputState = 0;
 
     mqttClient.loop();
 
@@ -78,21 +58,8 @@ void loop() {
                 inputState = 1;
             } else if (inputState == 1) {
                 strcpy(wifiPassword, inputString.c_str());
-
                 saveConfigToFile();
-
-                WiFi.begin(wifiSSID, wifiPassword);
-                while (WiFi.status() != WL_CONNECTED) {
-                    delay(500);
-                    Serial.print(".");
-                }
-                Serial.println("Connected to WiFi");
-
-                // Proceed to other setup steps
-                generateMDNSNanoleafURL();
-                setupMQTTClient();
-                attemptNanoleafConnection();
-
+                connectToWiFi();
                 inputState = 0;
             }
             inputString = "";
@@ -101,10 +68,43 @@ void loop() {
         }
     }
 
-    if (millis() - lastPublishTime >= PUBLISH_INTERVAL) {
-        publishStatus();
-        lastPublishTime = millis();
+    if (WiFi.status() == WL_CONNECTED) {
+        if (millis() - lastPublishTime >= PUBLISH_INTERVAL) {
+            publishStatus();
+            lastPublishTime = millis();
+        }
     }
+}
+
+void promptForCredentials() {
+    Serial.println("SSID: ");
+    while (strlen(wifiSSID) == 0 || strlen(wifiPassword) == 0) {
+        if (Serial.available()) {
+            String input = Serial.readStringUntil('\n');
+            if (strlen(wifiSSID) == 0) {
+                input.trim();
+                strncpy(wifiSSID, input.c_str(), sizeof(wifiSSID) - 1);
+                Serial.println("Password: ");
+            } else if (strlen(wifiPassword) == 0) {
+                input.trim();
+                strncpy(wifiPassword, input.c_str(), sizeof(wifiPassword) - 1);
+                saveConfigToFile();
+                connectToWiFi();
+            }
+        }
+    }
+}
+
+void connectToWiFi() {
+    WiFi.begin(wifiSSID, wifiPassword);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\nConnected to WiFi");
+    generateMDNSNanoleafURL();
+    setupMQTTClient();
+    attemptNanoleafConnection();
 }
 
 void initializeUUID() {
