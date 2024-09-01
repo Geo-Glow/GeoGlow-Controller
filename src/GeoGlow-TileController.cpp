@@ -71,7 +71,7 @@ void loop() {
 
     if (Serial.available()) {
         char inChar = (char)Serial.read();
-        if (inChar == "\n") {
+        if (inChar == '\n') {
             if (inputState == 0) {
                 strcpy(wifiSSID, inputString.c_str());
                 Serial.println("Password: ");
