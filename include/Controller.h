@@ -1,5 +1,5 @@
-#ifndef GEO_GLOW_TILE_CONTROLLER_H
-#define GEO_GLOW_TILE_CONTROLLER_H
+#ifndef CONTROLLER_H
+#define CONTROLLER_H
 
 #include <Arduino.h>
 #include <FS.h>
@@ -24,5 +24,7 @@ void setupWiFiManager();
 void setupMQTTClient();
 void publishStatus();
 void saveConfigCallback();
+void connectToWifi();
+void generateShortUUID(char* uuid, size_t length);
 
-#endif // GEO_GLOW_TILE_CONTROLLER_H
+#endif // CONTROLLER_H

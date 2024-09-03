@@ -7,7 +7,7 @@ MQTTClient::MQTTClient(WiFiClient &wifiClient)
     : client(wifiClient) {
 }
 
-void MQTTClient::setup(const char *mqttBroker, const int mqttPort, const char *friendId, const char *deviceId) {
+void MQTTClient::setup(const char *mqttBroker, const int mqttPort, const char *friendId) {
     client.setServer(mqttBroker, mqttPort);
 
     // Assign this instance to the static instance pointer
@@ -19,7 +19,6 @@ void MQTTClient::setup(const char *mqttBroker, const int mqttPort, const char *f
     client.setBufferSize(2048);
 
     this->friendId = friendId;
-    this->deviceId = deviceId;
 }
 
 void MQTTClient::loop() {
@@ -32,7 +31,7 @@ void MQTTClient::loop() {
 void MQTTClient::reconnect() {
     while (!client.connected()) {
         Serial.print("Attempting MQTT connection...");
-        String mqttClientId = "GeoGlow-" + this->friendId + "-" + this->deviceId;
+        String mqttClientId = "GeoGlow-" + this->friendId;
         if (client.connect(mqttClientId.c_str())) {
             Serial.println("connected: " + mqttClientId);
             for (const auto adapter: topicAdapters) {
@@ -60,7 +59,6 @@ void MQTTClient::publish(const char *topic, const JsonDocument &jsonPayload) {
 String MQTTClient::buildTopic(const TopicAdapter *adapter) const {
     String topic = "GeoGlow/";
     topic += friendId + "/";
-    topic += deviceId + "/";
     topic += adapter->getTopic();
     return topic;
 }
