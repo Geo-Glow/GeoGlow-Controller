@@ -10,7 +10,7 @@ const unsigned long PUBLISH_INTERVAL = 30000;
 const char* CONFIG_FILE = "/config.json";
 const size_t CONFIG_JSON_SIZE = 1024;
 const int MDNS_RETRIES = 10;      // Number of times to retry mDNS query
-const int MDNS_RETRY_DELAY = 2000;// Delay between retries in milliseconds
+const int MDNS_RETRY_DELAY = 1000;// Delay between retries in milliseconds
 const char* DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io";
 const int DEFAULT_MQTT_PORT = 1883;
 

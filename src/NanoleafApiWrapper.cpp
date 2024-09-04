@@ -130,25 +130,48 @@ bool NanoleafApiWrapper::setPower(const bool &state) {
 bool NanoleafApiWrapper::setStaticColors(const JsonObject &doc) {
     String animData = "";
     const unsigned int tileCount = doc.size();
-    animData += String(tileCount) + " ";
+    int totalDuration = 3600 * 1000; // 1 hour in milliseconds
+    int steps = 2; // Number of steps (1 step per minute for simplicity)
+    int stepDuration = totalDuration / steps; // Duration per step
+
+    animData += String(tileCount * steps) + " ";
 
     for (JsonPair kv: doc) {
         String tileId = kv.key().c_str();
         auto rgb = kv.value().as<JsonArray>();
-        animData += tileId + " 2 " + String(rgb[0].as<int>()) + " " + String(rgb[1].as<int>()) + " " +
-                String(rgb[2].as<int>()) + " 0 " + String(static_cast<int>(floor(random(5, 50)))) + " 0 0 0 0 360 ";
+
+        int startR = rgb[0].as<int>();
+        int startG = rgb[1].as<int>();
+        int startB = rgb[2].as<int>();
+        int endR = 0, endG = 0, endB = 0;
+
+        for (int i = 0; i <= steps; ++i) {
+            int R = startR + (endR - startR) * i / steps;
+            int G = startG + (endG - startG) * i / steps;
+            int B = startB + (endB - startB) * i / steps;
+            int startTime = i * stepDuration;
+
+            animData += tileId + " 2 " + String(R) + " " + String(G) + " " + String(B) + " 0 " + 
+                        String(stepDuration) + " 0 0 0 0 360 ";
+        }
     }
 
-    JsonDocument jsonPayload;
+    Serial.println(animData);
+
+    // Create the payload for sending the custom animation data
+    StaticJsonDocument<1024> jsonPayload;
     jsonPayload["write"] = JsonObject();
     jsonPayload["write"]["command"] = "display";
     jsonPayload["write"]["version"] = "2.0";
     jsonPayload["write"]["animType"] = "custom";
     jsonPayload["write"]["animData"] = animData;
     jsonPayload["write"]["loop"] = false;
+
+    // This portion from your example appears to try to add an empty palette; we'll leave this as-is
     jsonPayload["write"]["palette"] = JsonArray();
     jsonPayload["write"]["palette"].add(JsonObject());
-    jsonPayload["write"]["palette"][0]["hue"] = 0;
+    jsonPayload["write"]["palette"][0]["hue"] = 0; // Ensure this palette has some value
+    jsonPayload["write"]["duration"] = totalDuration / 1000; // Duration in seconds
 
     return sendRequest("PUT", "/effects", &jsonPayload, nullptr, true);
 }
