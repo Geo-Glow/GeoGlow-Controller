@@ -1,7 +1,18 @@
-#include "Controller.h"
+#include <Arduino.h>
+
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
+#include <ESP8266HTTPClient.h>
 #include <FS.h>
+#else
+#include <WiFi.h>
+#include <ESPmDNS.h>
+#include <HTTPClient.h>
+#include <SPIFFS.h>
+#endif
+
+#include "Controller.h"
 #include <ArduinoJson.h>
 #include <WiFiManager.h>
 
@@ -13,12 +24,14 @@ const int MDNS_RETRIES = 10;      // Number of times to retry mDNS query
 const int MDNS_RETRY_DELAY = 1000;// Delay between retries in milliseconds
 const char* DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io";
 const int DEFAULT_MQTT_PORT = 1883;
+const char* API_URL_PREFIX = "http://192.168.178.82:82/friends/";
 
 // Global Variables
 WiFiManager wifiManager;
-WiFiClient wifiClient;
-MQTTClient mqttClient(wifiClient);
-NanoleafApiWrapper nanoleaf(wifiClient);
+WiFiClient wifiClientForMQTT;
+WiFiClient wifiClientForHTTP;
+MQTTClient mqttClient(wifiClientForMQTT);
+NanoleafApiWrapper nanoleaf(wifiClientForMQTT);
 ColorPaletteAdapter colorPaletteAdapter(nanoleaf);
 
 unsigned long lastPublishTime = 0;
@@ -27,11 +40,35 @@ char ssid[32];
 char password[64];
 char nanoleafBaseUrl[55] = "";
 char nanoleafAuthToken[33] = "";
-char friendId[45] = ""; // Max Length: 36 (name) + 1 (seperator) + 8 (short UUID)
+char friendId[45] = "";
 char name[36] = "";
 char groupId[36] = "";
 
 bool shouldSaveConfig = false;
+
+void connectToWifi(bool useSavedCredentials) {
+    if (!useSavedCredentials || strlen(ssid) == 0 || strlen(password) == 0) {
+        setupWiFiManager();
+        return;
+    }
+
+    Serial.println("Connecting to Wi-Fi using saved credentials");
+    WiFi.begin(ssid, password);
+
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nConnected to Wi-Fi");
+    } else {
+        Serial.println("\nFailed to connect to Wi-Fi");
+        setupWiFiManager();
+    }
+}
 
 // Function Definitions
 void saveConfigCallback() {
@@ -93,16 +130,7 @@ void setup() {
 
     initializeUUID();
     loadConfigFromFile();
-
-    if (strlen(ssid) == 0 || strlen(password) == 0) {
-        setupWiFiManager();
-    } else {
-        connectToWifi();
-    }
-
-    if (strlen(name) != 0 && strlen(friendId) == 0) {
-        initializeUUID();
-    }
+    connectToWifi(true);
 
     if (strlen(nanoleafBaseUrl) == 0) {
         generateMDNSNanoleafURL();
@@ -110,7 +138,7 @@ void setup() {
     
     setupMQTTClient();
     attemptNanoleafConnection();
-
+    publishStatus();
     if (shouldSaveConfig) {
         saveConfigToFile();
     }
@@ -126,7 +154,11 @@ void loop() {
 }
 
 void loadConfigFromFile() {
+#if defined(ESP8266)
     if (!SPIFFS.begin()) {
+#else
+    if (!SPIFFS.begin(true)) {
+#endif
         Serial.println("Failed to mount FS");
         return;
     }
@@ -216,29 +248,7 @@ void attemptNanoleafConnection() {
     }
 }
 
-void connectToWifi() {
-    Serial.println("Connecting to Wi-Fi using saved credentials");
-
-    WiFi.begin(ssid, password);
-
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-        delay(500);
-        Serial.print(".");
-        attempts++;
-    }
-
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("\nConneted to Wi-Fi");
-    } else {
-        Serial.println("\nFailed to connect to Wi-Fi");
-        setupWiFiManager();
-    }
-}
-
 void setupWiFiManager() {
-    WiFiManager wifiManager;
-
     wifiManager.setSaveConfigCallback(saveConfigCallback);
 
     WiFiManagerParameter customGroupId("groupId", "Group ID", groupId, 36);
@@ -281,11 +291,30 @@ void setupMQTTClient() {
 void publishStatus() {
     StaticJsonDocument<200> jsonPayload;
     jsonPayload["friendId"] = friendId;
-    JsonArray panelIds = jsonPayload.createNestedArray("panelIds");
+    jsonPayload["name"] = name;
+    jsonPayload["groupId"] = groupId;
+    JsonArray tileIds = jsonPayload.createNestedArray("tileIds");
 
     for (const String &panelId: nanoleaf.getPanelIds()) {
-        panelIds.add(panelId);
+        tileIds.add(panelId);
     }
 
-    mqttClient.publish("GeoGlow/Friend-Service/ping", jsonPayload);
+    char buffer[512];
+    size_t n = serializeJson(jsonPayload, buffer);
+
+    HTTPClient httpClient;
+    String url = String(API_URL_PREFIX) + friendId;
+
+    httpClient.begin(wifiClientForHTTP, url);
+    httpClient.addHeader("Content-Type", "application/json");
+
+    int httpResponseCode = httpClient.sendRequest("PATCH", (uint8_t *) buffer, n);
+
+    if (httpResponseCode == 201 || httpResponseCode == 204) {
+        Serial.printf("PATCH successfull, response code: %d\n", httpResponseCode);
+    } else {
+        Serial.printf("Error occured while making PATCH request: %s\n", httpClient.errorToString(httpResponseCode).c_str());
+    }
+
+    httpClient.end();
 }
