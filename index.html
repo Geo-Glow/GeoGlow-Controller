@@ -1,7 +1,13 @@
 <!DOCTYPE html>
 <html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="styles.css" />
+  </head>
   <body>
-    <h1>Sample project for demoing ESP Web Tools</h1>
+    <div class="header">
+      <img src="logo.png" alt="Logo" class="logo" />
+      <h1>GeoGlow Firmware</h1>
+    </div>
 
     <div id="main" style="display: none">
       <br />
@@ -9,10 +15,13 @@
         type="module"
         src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"
       ></script>
-      <esp-web-install-button
-        id="installButton"
-        manifest="./manifest.json"
-      ></esp-web-install-button>
+      <esp-web-install-button id="installButton" manifest="./manifest.json">
+        <button slot="activate">Install GeoGlow</button>
+        <span slot="unsupported">Ah snap, your browser doesn't work!</span>
+        <span slot="not-allowed"
+          >Ah snap, you are not allowed to use this on HTTP!</span
+        >
+      </esp-web-install-button>
       <br />
       <span
         >NOTE: Make sure to close anything using your devices com port (e.g.
@@ -20,7 +29,7 @@
       >
     </div>
     <div id="notSupported" style="display: none">
-      Your browser does not support the Web Serial API. Try Chrome
+      Your browser does not support the Web Serial API. Try Chrome.
     </div>
 
     <script>
