@@ -1,0 +1,15 @@
+{
+    "name": "GeoGlow",
+    "builds": [
+        {
+            "chipFamily": "ESP8266",
+            "improv": true,
+            "parts": [
+                {
+                    "path": "firmware/firmware.bin",
+                    "offset": 0
+                }
+            ]
+        }
+    ]
+}

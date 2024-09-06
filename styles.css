@@ -1,0 +1,65 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f9;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    flex-direction: column;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.logo {
+    max-width: 100px;
+    margin-right: 20px;
+}
+
+h1 {
+    color: #a63fb7;
+}
+
+#main {
+    text-align: center;
+    padding: 20px;
+    border: 2px solid #a63fb7;
+    border-radius: 10px;
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+button {
+    background-color: #a63fb7;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+button:hover {
+    background-color: #f4893c;
+}
+
+span {
+    color: #a63fb7;
+}
+
+#notSupported {
+    color: #ff4d4d;
+    font-size: 18px;
+}
+
+/* Customizing ESP Web Tools */
+esp-web-install-button {
+    --esp-tools-button-color: #a63fb7;
+    --esp-tools-button-text-color: #fff;
+    --esp-tools-button-border-radius: 5px;
+}

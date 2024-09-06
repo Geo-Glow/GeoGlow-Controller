@@ -1,15 +1,23 @@
-#ifndef GEO_GLOW_TILE_CONTROLLER_H
-#define GEO_GLOW_TILE_CONTROLLER_H
+#ifndef CONTROLLER_H
+#define CONTROLLER_H
 
 #include <Arduino.h>
-#include <FS.h>
+
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
-#include <DNSServer.h>
 #include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+#include <FS.h>
+#else
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+#include <SPIFFS.h>
+#endif
+
+#include <DNSServer.h>
 #include <WiFiManager.h>
 #include <ArduinoJson.h>
-#include <UUID.h>
-#include <ESP8266mDNS.h>
 #include "MQTTClient.h"
 #include "NanoleafApiWrapper.h"
 #include "ColorPaletteAdapter.h"
@@ -24,5 +32,7 @@ void setupWiFiManager();
 void setupMQTTClient();
 void publishStatus();
 void saveConfigCallback();
-
-#endif // GEO_GLOW_TILE_CONTROLLER_H
+void connectToWifi();
+void generateShortUUID(char* uuid, size_t length);
+void connectToWifi(bool useSavedCredentials = true); 
+#endif // CONTROLLER_H

@@ -11,7 +11,7 @@ class MQTTClient {
 public:
     explicit MQTTClient(WiFiClient &wifiClient);
 
-    void setup(const char *mqttBroker, int mqttPort, const char *friendId, const char *deviceId);
+    void setup(const char *mqttBroker, int mqttPort, const char *friendId);
 
     void loop();
 
@@ -32,7 +32,6 @@ private:
 
     PubSubClient client;
     String friendId;
-    String deviceId;
     static std::vector<TopicAdapter *> topicAdapters;
     static MQTTClient* instance;
 };
