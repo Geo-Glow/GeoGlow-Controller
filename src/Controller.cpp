@@ -25,6 +25,9 @@ const int MDNS_RETRY_DELAY = 1000; // Delay between retries in milliseconds
 const char *DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io";
 const int DEFAULT_MQTT_PORT = 1883;
 const char *API_URL_PREFIX = "http://192.168.178.82:82/friends/";
+std::vector<String> trianglePanelIds;
+
+bool layoutChanged = false;
 
 // Global Variables
 WiFiManager wifiManager;
@@ -164,14 +167,24 @@ void setup()
         saveConfigToFile();
     }
 
-    std::vector<int> eventIds = {1};
+    std::vector<int> eventIds = {2};
     nanoleaf.registerEvents(eventIds);
+
+    nanoleaf.setLayoutChangeCallback([]()
+                                     { layoutChanged = true; });
 }
 
 void loop()
 {
     mqttClient.loop();
     nanoleaf.processEvents();
+
+    if (layoutChanged)
+    {
+        publishStatus();
+        layoutChanged = false;
+    }
+
     if (millis() - lastPublishTime >= PUBLISH_INTERVAL)
     {
         publishStatus();

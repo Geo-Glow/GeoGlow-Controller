@@ -31,6 +31,9 @@ public:
 
     void processEvents();
 
+    typedef std::function<void()> LayoutChangeCallback;
+    void setLayoutChangeCallback(LayoutChangeCallback callback);
+
 private:
     bool sendRequest(
         const String &method,
@@ -39,12 +42,14 @@ private:
         JsonDocument *responseBody,
         bool useAuthToken);
 
+    std::vector<String> triangleIds;
     String nanoleafBaseUrl;
     String nanoleafAuthToken;
     WiFiClient client;
     HTTPClient httpClient;
     WiFiClient *eventClient;
     bool registeredForEvents = false;
+    LayoutChangeCallback layoutChangeCallback;
 };
 
 #endif
