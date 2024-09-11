@@ -18,13 +18,13 @@
 
 // Constants
 const unsigned long PUBLISH_INTERVAL = 30000;
-const char* CONFIG_FILE = "/config.json";
+const char *CONFIG_FILE = "/config.json";
 const size_t CONFIG_JSON_SIZE = 1024;
-const int MDNS_RETRIES = 10;      // Number of times to retry mDNS query
-const int MDNS_RETRY_DELAY = 1000;// Delay between retries in milliseconds
-const char* DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io";
+const int MDNS_RETRIES = 10;       // Number of times to retry mDNS query
+const int MDNS_RETRY_DELAY = 1000; // Delay between retries in milliseconds
+const char *DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io";
 const int DEFAULT_MQTT_PORT = 1883;
-const char* API_URL_PREFIX = "http://192.168.178.82:82/friends/";
+const char *API_URL_PREFIX = "http://192.168.178.82:82/friends/";
 
 // Global Variables
 WiFiManager wifiManager;
@@ -46,8 +46,10 @@ char groupId[36] = "";
 
 bool shouldSaveConfig = false;
 
-void connectToWifi(bool useSavedCredentials) {
-    if (!useSavedCredentials || strlen(ssid) == 0 || strlen(password) == 0) {
+void connectToWifi(bool useSavedCredentials)
+{
+    if (!useSavedCredentials || strlen(ssid) == 0 || strlen(password) == 0)
+    {
         setupWiFiManager();
         return;
     }
@@ -56,51 +58,63 @@ void connectToWifi(bool useSavedCredentials) {
     WiFi.begin(ssid, password);
 
     int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    while (WiFi.status() != WL_CONNECTED && attempts < 20)
+    {
         delay(500);
         Serial.print(".");
         attempts++;
     }
 
-    if (WiFi.status() == WL_CONNECTED) {
+    if (WiFi.status() == WL_CONNECTED)
+    {
         Serial.println("\nConnected to Wi-Fi");
-    } else {
+    }
+    else
+    {
         Serial.println("\nFailed to connect to Wi-Fi");
         setupWiFiManager();
     }
 }
 
 // Function Definitions
-void saveConfigCallback() {
+void saveConfigCallback()
+{
     Serial.println("Should save config");
     shouldSaveConfig = true;
 }
 
-void generateShortUUID(char* uuid, size_t length) {
-    const char* hexChars = "0123456789ABCDEF";
-    for (size_t i = 0; i < length - 1; ++i) {
+void generateShortUUID(char *uuid, size_t length)
+{
+    const char *hexChars = "0123456789ABCDEF";
+    for (size_t i = 0; i < length - 1; ++i)
+    {
         uuid[i] = hexChars[random(16)];
     }
     uuid[length - 1] = '\0';
 }
 
-void initializeUUID() {
+void initializeUUID()
+{
     char shortUUID[9];
     generateShortUUID(shortUUID, sizeof(shortUUID));
     snprintf(friendId, sizeof(friendId), "%s@%s", name, shortUUID);
 }
 
-void generateMDNSNanoleafURL() {
-    if (MDNS.begin("esp8266")) {
+void generateMDNSNanoleafURL()
+{
+    if (MDNS.begin("esp8266"))
+    {
         Serial.println("MDNS responder started");
 
         int retryCount = 0;
-        while (retryCount < MDNS_RETRIES) {
+        while (retryCount < MDNS_RETRIES)
+        {
             Serial.printf("Attempt %d to query Nanoleaf service...\n", retryCount + 1);
             // Search for the Nanoleaf service (_nanoleafapi._tcp.local)
             int n = MDNS.queryService("nanoleafapi", "tcp");
 
-            if (n > 0) {
+            if (n > 0)
+            {
                 // Ideally, we expect just one Nanoleaf device to respond
                 String ip = MDNS.IP(0).toString();
                 int port = MDNS.port(0);
@@ -110,7 +124,9 @@ void generateMDNSNanoleafURL() {
                 shouldSaveConfig = true;
                 saveConfigToFile();
                 return;
-            } else {
+            }
+            else
+            {
                 Serial.println("No Nanoleaf service found, retrying...");
                 retryCount++;
                 delay(MDNS_RETRY_DELAY);
@@ -119,12 +135,15 @@ void generateMDNSNanoleafURL() {
 
         // If we exit the loop without finding a service
         Serial.println("Failed to discover Nanoleaf service after retries");
-    } else {
+    }
+    else
+    {
         Serial.println("Error starting mDNS");
     }
 }
 
-void setup() {
+void setup()
+{
     Serial.begin(115200);
     delay(10);
 
@@ -132,44 +151,55 @@ void setup() {
     loadConfigFromFile();
     connectToWifi(true);
 
-    if (strlen(nanoleafBaseUrl) == 0) {
+    if (strlen(nanoleafBaseUrl) == 0)
+    {
         generateMDNSNanoleafURL();
     }
-    
+
     setupMQTTClient();
     attemptNanoleafConnection();
     publishStatus();
-    if (shouldSaveConfig) {
+    if (shouldSaveConfig)
+    {
         saveConfigToFile();
     }
+
+    std::vector<int> eventIds = {1};
+    nanoleaf.registerEvents(eventIds);
 }
 
-void loop() {
+void loop()
+{
     mqttClient.loop();
-
-    if (millis() - lastPublishTime >= PUBLISH_INTERVAL) {
+    nanoleaf.processEvents();
+    if (millis() - lastPublishTime >= PUBLISH_INTERVAL)
+    {
         publishStatus();
         lastPublishTime = millis();
     }
 }
 
-void loadConfigFromFile() {
+void loadConfigFromFile()
+{
 #if defined(ESP8266)
-    if (!SPIFFS.begin()) {
+    if (!SPIFFS.begin())
+    {
 #else
-    if (!SPIFFS.begin(true)) {
+    if (!SPIFFS.begin(true))
+    {
 #endif
         Serial.println("Failed to mount FS");
         return;
     }
-    
-    if (!SPIFFS.exists(CONFIG_FILE)) {
+
+    if (!SPIFFS.exists(CONFIG_FILE))
+    {
         return;
     }
 
     File configFile = SPIFFS.open(CONFIG_FILE, "r");
     Serial.println("Reading config file");
-    
+
     size_t size = configFile.size();
     std::unique_ptr<char[]> buf(new char[size]);
     configFile.readBytes(buf.get(), size);
@@ -177,7 +207,8 @@ void loadConfigFromFile() {
     StaticJsonDocument<CONFIG_JSON_SIZE> jsonConfig;
     DeserializationError error = deserializeJson(jsonConfig, buf.get());
 
-    if (error) {
+    if (error)
+    {
         Serial.println("Failed to parse JSON config file");
         return;
     }
@@ -194,13 +225,16 @@ void loadConfigFromFile() {
     Serial.println("Parsed JSON config");
 }
 
-void saveConfigToFile() {
-    if (!shouldSaveConfig) return; // No need to save if no changes
+void saveConfigToFile()
+{
+    if (!shouldSaveConfig)
+        return; // No need to save if no changes
 
     SPIFFS.begin();
     File configFile = SPIFFS.open(CONFIG_FILE, "w");
-    
-    if (!configFile) {
+
+    if (!configFile)
+    {
         Serial.println("Failed to open config file for writing");
         return;
     }
@@ -219,18 +253,22 @@ void saveConfigToFile() {
     Serial.println("Config saved successfully");
 }
 
-void attemptNanoleafConnection() {
+void attemptNanoleafConnection()
+{
     nanoleaf.setup(nanoleafBaseUrl, nanoleafAuthToken);
     int attempts = 0;
     const int maxAttempts = 5;
 
-    while (!nanoleaf.isConnected() && attempts < maxAttempts) {
+    while (!nanoleaf.isConnected() && attempts < maxAttempts)
+    {
         Serial.printf("Attempting Nanoleaf connection... (%d/%d)\n", attempts + 1, maxAttempts);
         delay(5000);
 
-        if (!nanoleaf.isConnected()) {
+        if (!nanoleaf.isConnected())
+        {
             String newToken = nanoleaf.generateToken();
-            if (!newToken.isEmpty()) {
+            if (!newToken.isEmpty())
+            {
                 newToken.toCharArray(nanoleafAuthToken, sizeof(nanoleafAuthToken));
                 nanoleaf.setup(nanoleafBaseUrl, nanoleafAuthToken);
                 shouldSaveConfig = true;
@@ -239,16 +277,20 @@ void attemptNanoleafConnection() {
         attempts++;
     }
 
-    if (nanoleaf.isConnected()) {
+    if (nanoleaf.isConnected())
+    {
         Serial.println("Nanoleaf connected");
-    } else {
+    }
+    else
+    {
         Serial.println("Failed to connect to Nanoleaf with saved baseURL, reattempting MDNS lookup.");
         generateMDNSNanoleafURL();
         attemptNanoleafConnection();
     }
 }
 
-void setupWiFiManager() {
+void setupWiFiManager()
+{
     wifiManager.setSaveConfigCallback(saveConfigCallback);
 
     WiFiManagerParameter customGroupId("groupId", "Group ID", groupId, 36);
@@ -257,7 +299,8 @@ void setupWiFiManager() {
     wifiManager.addParameter(&customGroupId);
     wifiManager.addParameter(&customName);
 
-    if (!wifiManager.autoConnect("GeoGlow")) {
+    if (!wifiManager.autoConnect("GeoGlow"))
+    {
         Serial.println("Failed to connect and hit timeout");
         delay(3000);
         ESP.restart();
@@ -273,13 +316,16 @@ void setupWiFiManager() {
 
     shouldSaveConfig = true;
 
-    if (strlen(groupId) >= sizeof(groupId) - 1) groupId[sizeof(groupId) - 1] = '\0';
-    if (strlen(name) >= sizeof(name) - 1) name[sizeof(name) - 1] = '\0';
+    if (strlen(groupId) >= sizeof(groupId) - 1)
+        groupId[sizeof(groupId) - 1] = '\0';
+    if (strlen(name) >= sizeof(name) - 1)
+        name[sizeof(name) - 1] = '\0';
 
     initializeUUID();
 }
 
-void setupMQTTClient() {
+void setupMQTTClient()
+{
     mqttClient.setup(DEFAULT_MQTT_BROKER, DEFAULT_MQTT_PORT, friendId);
     mqttClient.addTopicAdapter(&colorPaletteAdapter);
 
@@ -288,14 +334,16 @@ void setupMQTTClient() {
     nanoleaf.setPower(false);
 }
 
-void publishStatus() {
+void publishStatus()
+{
     StaticJsonDocument<200> jsonPayload;
     jsonPayload["friendId"] = friendId;
     jsonPayload["name"] = name;
     jsonPayload["groupId"] = groupId;
     JsonArray tileIds = jsonPayload.createNestedArray("tileIds");
 
-    for (const String &panelId: nanoleaf.getPanelIds()) {
+    for (const String &panelId : nanoleaf.getPanelIds())
+    {
         tileIds.add(panelId);
     }
 
@@ -308,11 +356,14 @@ void publishStatus() {
     httpClient.begin(wifiClientForHTTP, url);
     httpClient.addHeader("Content-Type", "application/json");
 
-    int httpResponseCode = httpClient.sendRequest("PATCH", (uint8_t *) buffer, n);
+    int httpResponseCode = httpClient.sendRequest("PATCH", (uint8_t *)buffer, n);
 
-    if (httpResponseCode == 201 || httpResponseCode == 204) {
+    if (httpResponseCode == 201 || httpResponseCode == 204)
+    {
         Serial.printf("PATCH successfull, response code: %d\n", httpResponseCode);
-    } else {
+    }
+    else
+    {
         Serial.printf("Error occured while making PATCH request: %s\n", httpClient.errorToString(httpResponseCode).c_str());
     }
 
