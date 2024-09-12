@@ -4,12 +4,10 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
-// #include <FS.h>
 #else
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <HTTPClient.h>
-// #include <SPIFFS.h>
 #endif
 
 #include <LittleFS.h>
@@ -21,8 +19,6 @@
 const unsigned long PUBLISH_INTERVAL = 30000;
 const char *CONFIG_FILE = "/config.json";
 const size_t CONFIG_JSON_SIZE = 1024;
-const char *DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io";
-const int DEFAULT_MQTT_PORT = 1883;
 const char *API_URL_PREFIX = "http://192.168.178.82:82/friends/";
 
 bool layoutChanged = false;
@@ -45,6 +41,10 @@ const int WIFI_CONNECT_TIMEOUT = 5000; // Maximum time to wait for the connectio
 const int MDNS_MAX_RETRIES = 10;           // Maximum MDNS Retries
 const int MDNS_INITIAL_RETRY_DELAY = 1000; // Initial delay (in ms)
 const float MDNS_BACKOFF_FACTOR = 1.5;     // Backoff factor for exponential delay
+
+// MQTT Constants
+const char *DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io"; // MQTT Broker Address
+const int DEFAULT_MQTT_PORT = 1883;                      // MQTT Broker Port
 
 unsigned long lastPublishTime = 0;
 
@@ -349,7 +349,7 @@ void publishHeartbeat()
     String url = String(API_URL_PREFIX) + friendId + "/heartbeat";
     httpClient.begin(wifiClientForHTTP, url);
 
-    int httpResponseCode = httpClient.sendRequest("POST");
+    int httpResponseCode = httpClient.POST("{}");
     String responseMsg = httpClient.errorToString(httpResponseCode).c_str();
     switch (httpResponseCode)
     {
@@ -404,27 +404,21 @@ void publishStatus()
     httpClient.end();
 }
 
-void setup()
+void ensureNanoleafURL()
 {
-    Serial.begin(115200);
-    delay(10);
-
-    initializeUUID();
-    loadConfigFromFile();
-    connectToWifi(true);
-
     if (strlen(nanoleafBaseUrl) == 0)
     {
         generateMDNSNanoleafURL();
     }
+    Serial.println("Nanoleaf URL ensured.");
+}
 
-    setupMQTTClient();
-    attemptNanoleafConnection();
-
+void registerNanoleafEvents()
+{
     std::vector<int> eventIds = {2};
-
     bool success = false;
     const int maxRetries = 5;
+
     for (int attempt = 1; attempt <= maxRetries; attempt++)
     {
         success = nanoleaf.registerEvents(eventIds);
@@ -447,12 +441,35 @@ void setup()
         ESP.restart();
     }
 
+    Serial.println("Nanoleaf events registered.");
+}
+
+void publishInitialHeartbeat()
+{
     publishHeartbeat();
+    Serial.println("Initial Heartbeat published.");
 
     if (shouldSaveConfig)
     {
         saveConfigToFile();
+        Serial.println("Configuration saved.");
     }
+}
+
+void setup()
+{
+    Serial.begin(115200);
+    delay(10);
+
+    initializeUUID();
+    loadConfigFromFile();
+    connectToWifi(true);
+    ensureNanoleafURL();
+    setupMQTTClient();
+    attemptNanoleafConnection();
+    registerNanoleafEvents();
+    publishStatus();
+    publishInitialHeartbeat();
 }
 
 void loop()
