@@ -243,7 +243,7 @@ bool NanoleafApiWrapper::setStaticColors(const JsonObject &doc)
         animData += triangleId + " 2 " + String(fromFriendColor[0].as<int>()) + " " + String(fromFriendColor[1].as<int>()) + " " +
                     String(fromFriendColor[2].as<int>()) + " 0 " + String(10 * 360) + " 0 0 0 0 360 ";
     }
-    Serial.println(animData);
+
     JsonDocument jsonPayload;
     jsonPayload["write"] = JsonObject();
     jsonPayload["write"]["command"] = "display";

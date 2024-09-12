@@ -25,7 +25,6 @@ const int MDNS_RETRY_DELAY = 1000; // Delay between retries in milliseconds
 const char *DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io";
 const int DEFAULT_MQTT_PORT = 1883;
 const char *API_URL_PREFIX = "http://192.168.178.82:82/friends/";
-std::vector<String> trianglePanelIds;
 
 bool layoutChanged = false;
 
@@ -33,6 +32,7 @@ bool layoutChanged = false;
 WiFiManager wifiManager;
 WiFiClient wifiClientForMQTT;
 WiFiClient wifiClientForHTTP;
+HTTPClient httpClient;
 MQTTClient mqttClient(wifiClientForMQTT);
 NanoleafApiWrapper nanoleaf(wifiClientForMQTT);
 ColorPaletteAdapter colorPaletteAdapter(nanoleaf);
@@ -142,53 +142,6 @@ void generateMDNSNanoleafURL()
     else
     {
         Serial.println("Error starting mDNS");
-    }
-}
-
-void setup()
-{
-    Serial.begin(115200);
-    delay(10);
-
-    initializeUUID();
-    loadConfigFromFile();
-    connectToWifi(true);
-
-    if (strlen(nanoleafBaseUrl) == 0)
-    {
-        generateMDNSNanoleafURL();
-    }
-
-    setupMQTTClient();
-    attemptNanoleafConnection();
-    publishStatus();
-    if (shouldSaveConfig)
-    {
-        saveConfigToFile();
-    }
-
-    std::vector<int> eventIds = {2};
-    nanoleaf.registerEvents(eventIds);
-
-    nanoleaf.setLayoutChangeCallback([]()
-                                     { layoutChanged = true; });
-}
-
-void loop()
-{
-    mqttClient.loop();
-    nanoleaf.processEvents();
-
-    if (layoutChanged)
-    {
-        publishStatus();
-        layoutChanged = false;
-    }
-
-    if (millis() - lastPublishTime >= PUBLISH_INTERVAL)
-    {
-        publishStatus();
-        lastPublishTime = millis();
     }
 }
 
@@ -347,6 +300,31 @@ void setupMQTTClient()
     nanoleaf.setPower(false);
 }
 
+void publishHeartbeat()
+{
+    String url = String(API_URL_PREFIX) + friendId + "/heartbeat";
+    httpClient.begin(wifiClientForHTTP, url);
+
+    int httpResponseCode = httpClient.sendRequest("POST");
+    String responseMsg = httpClient.errorToString(httpResponseCode).c_str();
+    switch (httpResponseCode)
+    {
+    case 204:
+        Serial.println("Heartbeat posted");
+        break;
+    case 404:
+        publishStatus();
+        break;
+    case 500:
+        Serial.printf("Failed posting heartbeat: %s\n", responseMsg.c_str());
+        break;
+    default:
+        Serial.printf("Unknown error occured: %s\n", responseMsg.c_str());
+        break;
+    }
+    httpClient.end();
+}
+
 void publishStatus()
 {
     StaticJsonDocument<200> jsonPayload;
@@ -363,7 +341,6 @@ void publishStatus()
     char buffer[512];
     size_t n = serializeJson(jsonPayload, buffer);
 
-    HTTPClient httpClient;
     String url = String(API_URL_PREFIX) + friendId;
 
     httpClient.begin(wifiClientForHTTP, url);
@@ -381,4 +358,73 @@ void publishStatus()
     }
 
     httpClient.end();
+}
+
+void setup()
+{
+    Serial.begin(115200);
+    delay(10);
+
+    initializeUUID();
+    loadConfigFromFile();
+    connectToWifi(true);
+
+    if (strlen(nanoleafBaseUrl) == 0)
+    {
+        generateMDNSNanoleafURL();
+    }
+
+    setupMQTTClient();
+    attemptNanoleafConnection();
+
+    std::vector<int> eventIds = {2};
+
+    bool success = false;
+    const int maxRetries = 5;
+    for (int attempt = 1; attempt <= maxRetries; attempt++)
+    {
+        success = nanoleaf.registerEvents(eventIds);
+        if (success)
+        {
+            nanoleaf.setLayoutChangeCallback([]()
+                                             { layoutChanged = true; });
+            break;
+        }
+        else
+        {
+            Serial.printf("Event registration failed, attempt %d/%d\n", attempt, maxRetries);
+            delay(100);
+        }
+    }
+
+    if (!success)
+    {
+        Serial.println("Event registration failed after maximum retries. Restarting ESP.");
+        ESP.restart();
+    }
+
+    publishHeartbeat();
+
+    if (shouldSaveConfig)
+    {
+        saveConfigToFile();
+    }
+}
+
+void loop()
+{
+    mqttClient.loop();
+    nanoleaf.processEvents();
+
+    if (layoutChanged)
+    {
+        publishStatus();
+        layoutChanged = false;
+    }
+
+    if (millis() - lastPublishTime >= PUBLISH_INTERVAL)
+    {
+        publishHeartbeat();
+        lastPublishTime = millis();
+    }
 }
