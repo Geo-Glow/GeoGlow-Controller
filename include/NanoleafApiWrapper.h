@@ -6,7 +6,8 @@
 #include <ArduinoJson.h>
 #include <vector>
 
-class NanoleafApiWrapper {
+class NanoleafApiWrapper
+{
 public:
     explicit NanoleafApiWrapper(const WiFiClient &wifiClient);
 
@@ -18,11 +19,20 @@ public:
 
     bool identify();
 
+    String events();
+
     std::vector<String> getPanelIds();
 
     bool setPower(const bool &state);
 
     bool setStaticColors(const JsonObject &doc);
+
+    bool registerEvents(const std::vector<int> &eventIds);
+
+    void processEvents();
+
+    typedef std::function<void()> LayoutChangeCallback;
+    void setLayoutChangeCallback(LayoutChangeCallback callback);
 
 private:
     bool sendRequest(
@@ -30,12 +40,16 @@ private:
         const String &endpoint,
         const JsonDocument *requestBody,
         JsonDocument *responseBody,
-        bool useAuthToken
-    );
+        bool useAuthToken);
 
+    std::vector<String> triangleIds;
     String nanoleafBaseUrl;
     String nanoleafAuthToken;
     WiFiClient client;
+    HTTPClient httpClient;
+    WiFiClient *eventClient;
+    bool registeredForEvents = false;
+    LayoutChangeCallback layoutChangeCallback;
 };
 
 #endif
