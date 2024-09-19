@@ -33,6 +33,7 @@ void setupMQTTClient();
 void publishStatus();
 void saveConfigCallback();
 void connectToWifi();
-void generateShortUUID(char* uuid, size_t length);
-void connectToWifi(bool useSavedCredentials = true); 
+void generateShortUUID(char *uuid, size_t length);
+void connectToWifi(bool useSavedCredentials = true);
+void registerNanoleafEvents();
 #endif // CONTROLLER_H

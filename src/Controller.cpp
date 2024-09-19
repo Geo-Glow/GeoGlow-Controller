@@ -19,7 +19,7 @@
 const unsigned long PUBLISH_INTERVAL = 30000;
 const char *CONFIG_FILE = "/config.json";
 const size_t CONFIG_JSON_SIZE = 1024;
-const char *API_URL_PREFIX = "http://192.168.178.82:82/friends/";
+const char *API_URL_PREFIX = "http://eu1.pitunnel.net:36369/friends/";
 
 bool layoutChanged = false;
 
@@ -307,7 +307,7 @@ void attemptNanoleafConnection()
     while (!nanoleaf.isConnected() && attempts < maxAttempts)
     {
         Serial.printf("Attempting Nanoleaf connection... (%d/%d)\n", attempts + 1, maxAttempts);
-        delay(5000);
+        delay(6000);
 
         if (!nanoleaf.isConnected())
         {
@@ -325,6 +325,7 @@ void attemptNanoleafConnection()
     if (nanoleaf.isConnected())
     {
         Serial.println("Nanoleaf connected");
+        registerNanoleafEvents();
     }
     else
     {
@@ -346,6 +347,22 @@ void setupMQTTClient()
 
 void publishHeartbeat()
 {
+    if (!nanoleaf.isConnected())
+    {
+        Serial.println("Lost connection to nanoleafs. Trying to reconnect.");
+        attemptNanoleafConnection();
+
+        if (nanoleaf.isConnected())
+        {
+            Serial.println("Reconnecting worked! Continuing as before.");
+        }
+        else
+        {
+            Serial.println("Connection failed. Restarting ESP");
+            ESP.restart();
+        }
+    }
+
     String url = String(API_URL_PREFIX) + friendId + "/heartbeat";
     httpClient.begin(wifiClientForHTTP, url);
 
@@ -386,7 +403,6 @@ void publishStatus()
     size_t n = serializeJson(jsonPayload, buffer);
 
     String url = String(API_URL_PREFIX) + friendId;
-
     httpClient.begin(wifiClientForHTTP, url);
     httpClient.addHeader("Content-Type", "application/json");
 
@@ -467,7 +483,6 @@ void setup()
     ensureNanoleafURL();
     setupMQTTClient();
     attemptNanoleafConnection();
-    registerNanoleafEvents();
     publishStatus();
     publishInitialHeartbeat();
 }
