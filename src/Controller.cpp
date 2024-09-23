@@ -19,7 +19,7 @@
 const unsigned long PUBLISH_INTERVAL = 30000;
 const char *CONFIG_FILE = "/config.json";
 const size_t CONFIG_JSON_SIZE = 1024;
-const char *API_URL_PREFIX = "http://eu1.pitunnel.net:36369/friends/";
+const char *API_URL_PREFIX = "http://139.6.56.197/friends";
 
 bool layoutChanged = false;
 
