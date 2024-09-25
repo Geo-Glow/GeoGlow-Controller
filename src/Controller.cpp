@@ -497,16 +497,14 @@ void userPrompt()
                 Serial.println("Ungültige Eingabe. Bitte geben Sie 'y' ein um fortzufahren.");
             }
         }
-        delay(100);
+        delay(500);
     }
 }
 
 void initialSetup()
 {
-    while (!Serial)
-    {
-        delay(500);
-    }
+    Serial.println("Sie werden nun durch das Setup geleitet. Sobald Sie bereit sind können wir fortfahren.");
+    userPrompt();
 
     Serial.println("Captive Portal wird aufgesetzt...");
     setupWiFiManager();
