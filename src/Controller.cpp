@@ -503,6 +503,10 @@ void userPrompt()
 
 void initialSetup()
 {
+    while (!Serial.availableForWrite())
+    {
+        delay(100);
+    }
     Serial.println("Sie werden nun durch das Setup geleitet. Sobald Sie bereit sind können wir fortfahren.");
     userPrompt();
 
