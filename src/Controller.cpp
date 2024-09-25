@@ -503,11 +503,12 @@ void userPrompt()
 
 void initialSetup()
 {
-    while (!Serial)
+    delay(10000);
+    /*while (!Serial)
     {
         Serial.begin(115200);
         delay(500);
-    }
+    }*/
 
     Serial.println("Captive Portal wird aufgesetzt...");
     setupWiFiManager();
