@@ -2,12 +2,13 @@
     "name": "GeoGlow",
     "version": "1.0.0",
     "new_install_prompt_erase": true,
+    "new_install_improv_wait_time": 15,
     "builds": [
         {
             "chipFamily": "ESP8266",
             "parts": [
                 {
-                    "path": "firmware/firmware-1.0.0.bin",
+                    "path": "firmware/firmware-1.0.1.bin",
                     "offset": 0
                 }
             ]

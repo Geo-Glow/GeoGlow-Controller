@@ -503,7 +503,6 @@ void userPrompt()
 
 void initialSetup()
 {
-    delay(10000);
     /*while (!Serial)
     {
         Serial.begin(115200);
