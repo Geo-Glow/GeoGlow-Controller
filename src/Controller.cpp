@@ -553,10 +553,6 @@ void setup()
 {
     Serial.begin(115200);
     delay(10);
-    while (true)
-    {
-        Serial.println("Im working!");
-    }
     loadConfigFromFile();
 
     if (!initialSetupDone)
