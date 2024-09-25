@@ -26,7 +26,7 @@
 void initializeUUID();
 void loadConfigFromFile();
 void saveConfigToFile();
-void generateMDNSNanoleafURL();
+bool generateMDNSNanoleafURL();
 void attemptNanoleafConnection();
 void setupWiFiManager();
 void setupMQTTClient();

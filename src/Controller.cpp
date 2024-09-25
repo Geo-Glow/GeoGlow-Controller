@@ -19,9 +19,10 @@
 const unsigned long PUBLISH_INTERVAL = 30000;
 const char *CONFIG_FILE = "/config.json";
 const size_t CONFIG_JSON_SIZE = 1024;
-const char *API_URL_PREFIX = "http://139.6.56.197/friends";
+const char *API_URL_PREFIX = "http://139.6.56.197/friends/";
 
 bool layoutChanged = false;
+bool initialSetupDone = false;
 
 // Global Variables
 WiFiManager wifiManager;
@@ -37,6 +38,10 @@ const int WIFI_MAX_ATTEMPTS = 10;      // Maximum Wifi connection attempts
 const int WIFI_RETRY_DELAY = 500;      // Delay between each attempt
 const int WIFI_CONNECT_TIMEOUT = 5000; // Maximum time to wait for the connection (in ms)
 
+// WIFI Vars
+char ssid[32];     // Wifi SSID
+char password[64]; // Wifi Password
+
 // MDNS Constants
 const int MDNS_MAX_RETRIES = 10;           // Maximum MDNS Retries
 const int MDNS_INITIAL_RETRY_DELAY = 1000; // Initial delay (in ms)
@@ -46,16 +51,16 @@ const float MDNS_BACKOFF_FACTOR = 1.5;     // Backoff factor for exponential del
 const char *DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io"; // MQTT Broker Address
 const int DEFAULT_MQTT_PORT = 1883;                      // MQTT Broker Port
 
-unsigned long lastPublishTime = 0;
+// NanoLeaf Vars
+char nanoleafBaseUrl[55] = "";   // NanoLeaf Baseurl (http://<ip>:<port>)
+char nanoleafAuthToken[33] = ""; // Nanoleaf Auth Token
 
-char ssid[32];
-char password[64];
-char nanoleafBaseUrl[55] = "";
-char nanoleafAuthToken[33] = "";
+// Setup Vars
 char friendId[45] = "";
 char name[36] = "";
 char groupId[36] = "";
 
+unsigned long lastPublishTime = 0;
 bool shouldSaveConfig = false;
 
 void connectToWifi(bool useSavedCredentials)
@@ -92,6 +97,7 @@ void connectToWifi(bool useSavedCredentials)
 
 void setupWiFiManager()
 {
+    wifiManager.setDebugOutput(false); // Disable the debug output to keep Serial clean
     wifiManager.setSaveConfigCallback(saveConfigCallback);
 
     WiFiManagerParameter customGroupId("groupId", "Group ID", groupId, 36);
@@ -107,28 +113,24 @@ void setupWiFiManager()
         ESP.restart();
     }
 
-    Serial.println("WiFi Manager connected");
+    Serial.println("WiFi Manager has established a connection.");
 
     strncpy(ssid, WiFi.SSID().c_str(), sizeof(ssid) - 1);
     strncpy(password, WiFi.psk().c_str(), sizeof(password) - 1);
     strncpy(groupId, customGroupId.getValue(), sizeof(groupId) - 1);
     strncpy(name, customName.getValue(), sizeof(name) - 1);
 
-    shouldSaveConfig = true;
-
     // Checks to prevent buffer overflow
     if (strlen(groupId) >= sizeof(groupId) - 1)
         groupId[sizeof(groupId) - 1] = '\0';
     if (strlen(name) >= sizeof(name) - 1)
         name[sizeof(name) - 1] = '\0';
-
-    initializeUUID();
 }
 
 // Function Definitions
 void saveConfigCallback()
 {
-    Serial.println("Should save config");
+    Serial.println("Config should be saved.");
     shouldSaveConfig = true;
 }
 
@@ -147,20 +149,21 @@ void initializeUUID()
     char shortUUID[9];
     generateShortUUID(shortUUID, sizeof(shortUUID));
     snprintf(friendId, sizeof(friendId), "%s@%s", name, shortUUID);
+    Serial.println("Initialized UUID.");
 }
 
-void generateMDNSNanoleafURL()
+bool generateMDNSNanoleafURL()
 {
     if (MDNS.begin("esp8266"))
     {
-        Serial.println("MDNS responder started");
+        Serial.println("MDNS wurde gestartet.");
 
         int retryCount = 0;
         int retryDelay = MDNS_INITIAL_RETRY_DELAY;
 
         while (retryCount < MDNS_MAX_RETRIES)
         {
-            Serial.printf("Attempt %d to query Nanoleaf service...\n", retryCount + 1);
+            Serial.printf("Versuch %d den Nanoleaf Service zu finden...\n", retryCount + 1);
             int n = MDNS.queryService("nanoleafapi", "tcp");
 
             if (n > 0)
@@ -169,14 +172,13 @@ void generateMDNSNanoleafURL()
                 int port = MDNS.port(0);
 
                 snprintf(nanoleafBaseUrl, sizeof(nanoleafBaseUrl), "http://%s:%d", ip.c_str(), port);
-                Serial.printf("Nanoleaf service found at: %s\n", nanoleafBaseUrl);
-                shouldSaveConfig = true;
+                Serial.printf("Nanoleaf Service wurde gefunden: %s\n", nanoleafBaseUrl);
                 saveConfigToFile();
-                return;
+                return true;
             }
             else
             {
-                Serial.println("No Nanoleaf service found, retrying...");
+                Serial.println("Es wurde kein Nanoleaf Service gefunden. Neuer Versuch...");
                 retryCount++;
                 delay(retryDelay);
 
@@ -190,12 +192,13 @@ void generateMDNSNanoleafURL()
         }
 
         // If we exit the loop without finding a service
-        Serial.println("Failed to discover Nanoleaf service after maximum retries");
+        Serial.println("Es konnte kein Nanoleaf Service nach der maximalen Anzahl an Versuchen gefunden werden.");
     }
     else
     {
-        Serial.println("Error starting mDNS.");
+        Serial.println("Fehler beim Starten von MNDS.");
     }
+    return false;
 }
 
 void loadConfigFromFile()
@@ -251,15 +254,13 @@ void loadConfigFromFile()
     strncpy(groupId, jsonConfig["groupId"], sizeof(groupId) - 1);
     strncpy(nanoleafBaseUrl, jsonConfig["nanoleafBaseUrl"], sizeof(nanoleafBaseUrl) - 1);
     strncpy(friendId, jsonConfig["friendId"], sizeof(friendId) - 1);
+    initialSetupDone = jsonConfig["setupDone"];
 
     Serial.println("Parsed JSON config");
 }
 
 void saveConfigToFile()
 {
-    if (!shouldSaveConfig)
-        return; // No need to save if no changes
-
     if (!LittleFS.begin())
     {
         Serial.println("Failed to mount FS for save");
@@ -282,6 +283,7 @@ void saveConfigToFile()
     jsonConfig["name"] = name;
     jsonConfig["nanoleafBaseUrl"] = nanoleafBaseUrl;
     jsonConfig["groupId"] = groupId;
+    jsonConfig["setupDone"] = initialSetupDone;
 
     if (serializeJson(jsonConfig, configFile) == 0)
     {
@@ -339,10 +341,6 @@ void setupMQTTClient()
 {
     mqttClient.setup(DEFAULT_MQTT_BROKER, DEFAULT_MQTT_PORT, friendId);
     mqttClient.addTopicAdapter(&colorPaletteAdapter);
-
-    nanoleaf.setPower(true);
-    delay(1500);
-    nanoleaf.setPower(false);
 }
 
 void publishHeartbeat()
@@ -424,9 +422,16 @@ void ensureNanoleafURL()
 {
     if (strlen(nanoleafBaseUrl) == 0)
     {
-        generateMDNSNanoleafURL();
+        bool success = generateMDNSNanoleafURL();
+        if (success)
+        {
+            Serial.println("NanoLeaf URL wurde gefunden.");
+        }
+        else
+        {
+            Serial.println("Nanoleaf URL konnte nicht gefunden werden.");
+        }
     }
-    Serial.println("Nanoleaf URL ensured.");
 }
 
 void registerNanoleafEvents()
@@ -472,13 +477,94 @@ void publishInitialHeartbeat()
     }
 }
 
+void userPrompt()
+{
+    Serial.println("Bitte geben Sie 'y' ein um fortzufahren.");
+
+    while (true)
+    {
+        if (Serial.available() > 0)
+        {
+            char input = Serial.read();
+
+            if (input == 'y' || input == 'Y')
+            {
+                Serial.println("Vielen Dank. Das Setup wird nun fortgesetzt...");
+                break;
+            }
+            else
+            {
+                Serial.println("Ungültige Eingabe. Bitte geben Sie 'y' ein um fortzufahren.");
+            }
+        }
+        delay(100);
+    }
+}
+
+void initialSetup()
+{
+    while (!Serial)
+    {
+        Serial.begin(115200);
+        delay(500);
+    }
+
+    Serial.println("Captive Portal wird aufgesetzt...");
+    setupWiFiManager();
+    Serial.print("\n\n");
+
+    Serial.println("UUID wird generiert...");
+    initializeUUID();
+    Serial.print("\n\n");
+
+    Serial.println("Bitte stellen Sie sicher, dass Ihre Nanoleafs eingesteckt und eingerichtet sind.\nSobald Sie bereit sind können wir fortfahren.");
+    userPrompt();
+    Serial.print("\n\n");
+    Serial.println("Die Suche nach der Nanoleaf URL wird gestartet...");
+    ensureNanoleafURL();
+    Serial.print("\n\n");
+
+    Serial.println("MQTT Verbindung wird aufgebaut...");
+    setupMQTTClient();
+    Serial.print("\n\n");
+
+    Serial.println("Als nächstes wird der Auth Token generiert.\nBitte aktivieren Sie in der NanoLeaf-App die Verbindung zur API,");
+    Serial.println("oder halten sie den Power Button für 5 Sekunden gedrückt (wie in der Anleitung beschrieben). Danach kann fortgefahren werden.");
+    userPrompt();
+    Serial.print("\n\n");
+    attemptNanoleafConnection();
+    Serial.print("\n\n");
+
+    Serial.println("Als letzten Schritt müssen Sie ihre friendId in der GeoGlow App eintragen.");
+    Serial.println("Dafür öffnen Sie bitte die App (wie in der Anleitung beschrieben) und tragen folgende ID ein: ");
+    Serial.println("#####    " + String(friendId) + "    #####");
+    userPrompt();
+
+    initialSetupDone = true;
+    saveConfigToFile();
+    Serial.print("\n\n");
+
+    Serial.println("Ersteinrichtung abgeschlossen. Der ESP wird in 5 Sekunden neu gestartet...");
+    delay(5000);
+    ESP.restart();
+}
+
 void setup()
 {
     Serial.begin(115200);
     delay(10);
-
-    initializeUUID();
+    while (true)
+    {
+        Serial.println("Im working!");
+    }
     loadConfigFromFile();
+
+    if (!initialSetupDone)
+    {
+        initialSetup();
+    }
+
+    // loadConfigFromFile();
     connectToWifi(true);
     ensureNanoleafURL();
     setupMQTTClient();
