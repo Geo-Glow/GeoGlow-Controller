@@ -553,7 +553,6 @@ void initialSetup()
 void setup()
 {
     Serial.begin(115200);
-    delay(10);
     /*loadConfigFromFile();
 
     if (!initialSetupDone)
@@ -574,6 +573,7 @@ void setup()
 void loop()
 {
     Serial.println("Test");
+    delay(2000);
     /*mqttClient.loop();
     nanoleaf.processEvents();
 

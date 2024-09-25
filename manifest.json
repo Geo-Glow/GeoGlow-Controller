@@ -1,5 +1,6 @@
 {
     "name": "GeoGlow",
+    "new_install_prompt_erase": true,
     "builds": [
         {
             "chipFamily": "ESP8266",
