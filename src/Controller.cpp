@@ -553,7 +553,7 @@ void initialSetup()
 void setup()
 {
     Serial.begin(115200);
-    /*loadConfigFromFile();
+    loadConfigFromFile();
 
     if (!initialSetupDone)
     {
@@ -567,14 +567,11 @@ void setup()
     attemptNanoleafConnection();
     publishStatus();
     publishInitialHeartbeat();
-    */
 }
 
 void loop()
 {
-    Serial.println("Test");
-    delay(2000);
-    /*mqttClient.loop();
+    mqttClient.loop();
     nanoleaf.processEvents();
 
     if (layoutChanged)
@@ -587,5 +584,5 @@ void loop()
     {
         publishHeartbeat();
         lastPublishTime = millis();
-    }*/
+    }
 }
