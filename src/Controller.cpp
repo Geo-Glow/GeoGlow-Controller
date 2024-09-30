@@ -102,9 +102,11 @@ void setupWiFiManager()
 
     WiFiManagerParameter customGroupId("groupId", "Group ID", groupId, 36);
     WiFiManagerParameter customName("name", "Name", name, 36);
+    WiFiManagerParameter customNanoLeaf("nanoleafBaseUrl", "NanoLeaf Url", nanoleafBaseUrl, 36);
 
     wifiManager.addParameter(&customGroupId);
     wifiManager.addParameter(&customName);
+    wifiManager.addParameter(&customNanoLeaf);
 
     if (!wifiManager.autoConnect("GeoGlow"))
     {
@@ -119,6 +121,7 @@ void setupWiFiManager()
     strncpy(password, WiFi.psk().c_str(), sizeof(password) - 1);
     strncpy(groupId, customGroupId.getValue(), sizeof(groupId) - 1);
     strncpy(name, customName.getValue(), sizeof(name) - 1);
+    strncpy(nanoleafBaseUrl, customNanoLeaf.getValue(), sizeof(nanoleafBaseUrl) - 1);
 
     // Checks to prevent buffer overflow
     if (strlen(groupId) >= sizeof(groupId) - 1)
@@ -332,7 +335,7 @@ void attemptNanoleafConnection()
     else
     {
         Serial.println("Failed to connect to Nanoleaf with saved baseURL, reattempting MDNS lookup.");
-        generateMDNSNanoleafURL();
+        // generateMDNSNanoleafURL();
         attemptNanoleafConnection();
     }
 }
@@ -422,7 +425,7 @@ void ensureNanoleafURL()
 {
     if (strlen(nanoleafBaseUrl) == 0)
     {
-        bool success = generateMDNSNanoleafURL();
+        bool success = false; // generateMDNSNanoleafURL();
         if (success)
         {
             Serial.println("NanoLeaf URL wurde gefunden.");
