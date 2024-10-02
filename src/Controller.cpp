@@ -1,30 +1,4 @@
-#include <Arduino.h>
-
-#if defined(ESP8266)
-#include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
-#include <ESP8266HTTPClient.h>
-#else
-#include <WiFi.h>
-#include <ESPmDNS.h>
-#include <HTTPClient.h>
-#endif
-
-#include <LittleFS.h>
 #include "Controller.h"
-#include <ArduinoJson.h>
-#include <WiFiManager.h>
-#include <Wire.h>
-#include <SeeedOLED.h>
-
-// Constants
-const unsigned long PUBLISH_INTERVAL = 30000;
-const char *CONFIG_FILE = "/config.json";
-const size_t CONFIG_JSON_SIZE = 1024;
-const char *API_URL_PREFIX = "http://139.6.56.197/friends/";
-
-bool layoutChanged = false;
-bool initialSetupDone = false;
 
 // Global Variables
 WiFiManager wifiManager;
@@ -34,24 +8,11 @@ HTTPClient httpClient;
 MQTTClient mqttClient(wifiClientForMQTT);
 NanoleafApiWrapper nanoleaf(wifiClientForMQTT);
 ColorPaletteAdapter colorPaletteAdapter(nanoleaf);
+OledDisplay oledDisplay;
 
-// WIFI Constants
-const int WIFI_MAX_ATTEMPTS = 10;      // Maximum Wifi connection attempts
-const int WIFI_RETRY_DELAY = 500;      // Delay between each attempt
-const int WIFI_CONNECT_TIMEOUT = 5000; // Maximum time to wait for the connection (in ms)
-
-// WIFI Vars
+// Wi-Fi credentials
 char ssid[32];     // Wifi SSID
 char password[64]; // Wifi Password
-
-// MDNS Constants
-const int MDNS_MAX_RETRIES = 10;           // Maximum MDNS Retries
-const int MDNS_INITIAL_RETRY_DELAY = 1000; // Initial delay (in ms)
-const float MDNS_BACKOFF_FACTOR = 1.5;     // Backoff factor for exponential delay
-
-// MQTT Constants
-const char *DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io"; // MQTT Broker Address
-const int DEFAULT_MQTT_PORT = 1883;                      // MQTT Broker Port
 
 // NanoLeaf Vars
 char nanoleafBaseUrl[55] = "";   // NanoLeaf Baseurl (http://<ip>:<port>)
@@ -62,8 +23,11 @@ char friendId[45] = "";
 char name[36] = "";
 char groupId[36] = "";
 
+// Flags and Timers
 unsigned long lastPublishTime = 0;
 bool shouldSaveConfig = false;
+bool layoutChanged = false;
+bool initialSetupDone = false;
 
 void connectToWifi(bool useSavedCredentials)
 {
@@ -205,47 +169,9 @@ bool generateMDNSNanoleafURL()
 
 void loadConfigFromFile()
 {
-    if (!LittleFS.begin())
-    {
-        Serial.println("Failed to mount FS");
-        return;
-    }
-
-    if (!LittleFS.exists(CONFIG_FILE))
-    {
-        Serial.println("Config file does not exist");
-        LittleFS.end();
-        return;
-    }
-
-    File configFile = LittleFS.open(CONFIG_FILE, "r");
-    if (!configFile)
-    {
-        Serial.println("Failed to open config file");
-        LittleFS.end();
-        return;
-    }
-
-    size_t size = configFile.size();
-    if (size > CONFIG_JSON_SIZE)
-    {
-        Serial.println("Config file is too large");
-        configFile.close();
-        LittleFS.end();
-        return;
-    }
-
-    std::unique_ptr<char[]> buf(new char[size]);
-    configFile.readBytes(buf.get(), size);
-    configFile.close();
-    LittleFS.end();
-
     StaticJsonDocument<CONFIG_JSON_SIZE> jsonConfig;
-    DeserializationError error = deserializeJson(jsonConfig, buf.get());
-
-    if (error)
+    if (!FileSystemHandler::loadConfigFromFile(CONFIG_FILE, jsonConfig, CONFIG_JSON_SIZE))
     {
-        Serial.println("Failed to parse JSON config file");
         return;
     }
 
@@ -263,20 +189,6 @@ void loadConfigFromFile()
 
 void saveConfigToFile()
 {
-    if (!LittleFS.begin())
-    {
-        Serial.println("Failed to mount FS for save");
-        return;
-    }
-
-    File configFile = LittleFS.open(CONFIG_FILE, "w");
-    if (!configFile)
-    {
-        Serial.println("Failed to open config file for writing");
-        LittleFS.end();
-        return;
-    }
-
     StaticJsonDocument<CONFIG_JSON_SIZE> jsonConfig;
     jsonConfig["ssid"] = ssid;
     jsonConfig["password"] = password;
@@ -286,20 +198,12 @@ void saveConfigToFile()
     jsonConfig["nanoleafBaseUrl"] = nanoleafBaseUrl;
     jsonConfig["groupId"] = groupId;
     jsonConfig["setupDone"] = initialSetupDone;
-
-    if (serializeJson(jsonConfig, configFile) == 0)
-    {
-        Serial.println("Failed to write JSON to config file");
-    }
-    else
-    {
-        Serial.println("Config saved successfully");
-    }
-
-    configFile.close();
-    LittleFS.end();
-
     shouldSaveConfig = false;
+
+    if (!FileSystemHandler::saveConfigToFile(CONFIG_FILE, jsonConfig))
+    {
+        Serial.println("Error");
+    }
 }
 
 void attemptNanoleafConnection()
@@ -507,69 +411,15 @@ void userPrompt()
     }
 }
 
-void initOled()
-{
-    Wire.begin();
-    SeeedOled.init();
-    SeeedOled.clearDisplay();
-    SeeedOled.setNormalDisplay();
-    SeeedOled.setPageMode();
-}
-
-void printToOled(char *text, bool clearDisplay = false, int textDelay = 0)
-{
-    const int maxColumns = 16;
-    const int maxRows = 8;
-
-    if (clearDisplay)
-    {
-        SeeedOled.clearDisplay();
-    }
-
-    int row = 0;
-    int col = 0;
-
-    while (*text)
-    {
-        if (col == maxColumns || *text == '\n')
-        {
-            row++;
-            col = 0;
-            if (row == maxRows)
-            {
-                delay(textDelay);
-                SeeedOled.clearDisplay();
-                row = 0;
-            }
-            if (*text == '\n')
-            {
-                text++;
-                continue;
-            }
-        }
-
-        SeeedOled.setTextXY(row, col);
-        SeeedOled.putChar(*text);
-        text++;
-        col++;
-    }
-
-    delay(textDelay);
-    if (clearDisplay)
-    {
-        SeeedOled.clearDisplay();
-    }
-}
-
 void initialSetup()
 {
     bool success = false;
-    initOled();
+    oledDisplay.init();
     delay(100);
-    printToOled("Setup beginnt in 5 Sekunden.", true, 5000);
+    oledDisplay.printToOled("Setup beginnt in 5 Sekunden.", true, 5000);
 
     Serial.println("Captive Portal wird aufgesetzt.");
-    printToOled("Captive Portal wird aufgesetzt...");
+    oledDisplay.printToOled("Captive Portal wird aufgesetzt...");
     setupWiFiManager();
 
     Serial.println("UUID wird generiert...");
@@ -578,7 +428,7 @@ void initialSetup()
     Serial.println("Nanoleaf MDNS Lookup");
 
     Serial.println("Die Suche nach der Nanoleaf URL wird gestartet...");
-    printToOled("Suche Nach Nanoleafs");
+    oledDisplay.printToOled("Suche Nach Nanoleafs");
     while (!success)
     {
         SeeedOled.setTextXY(7, 0);
@@ -586,22 +436,22 @@ void initialSetup()
         delay(500);
         success = ensureNanoleafURL();
     }
-    printToOled("Nanoleafs wurden gefunden.", true, 5000);
+    oledDisplay.printToOled("Nanoleafs wurden gefunden.", true, 5000);
 
     Serial.println("MQTT Verbindung wird aufgebaut...");
     setupMQTTClient();
 
     Serial.println("Nanoleaf Auth token generation");
-    printToOled("Nanoleaf API aktivieren", true, 10000);
+    oledDisplay.printToOled("Nanoleaf API aktivieren", true, 10000);
     attemptNanoleafConnection();
-    printToOled("Nanoleafs erfolgreich verbunden.", true, 5000);
+    oledDisplay.printToOled("Nanoleafs erfolgreich verbunden.", true, 5000);
     SeeedOled.clearDisplay();
     SeeedOled.setTextXY(0, 0);
     SeeedOled.putString("FriendID: ");
     SeeedOled.setTextXY(2, 0);
     SeeedOled.putString(friendId);
     delay(60 * 1000);
-    printToOled("Neustart: ", true, 5000);
+    oledDisplay.printToOled("Neustart: ", true, 5000);
 
     initialSetupDone = true;
     saveConfigToFile();

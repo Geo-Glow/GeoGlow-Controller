@@ -18,9 +18,33 @@
 #include <DNSServer.h>
 #include <WiFiManager.h>
 #include <ArduinoJson.h>
+
+// Custom Modules
 #include "MQTTClient.h"
 #include "NanoleafApiWrapper.h"
 #include "ColorPaletteAdapter.h"
+#include "FileSystemHandler.h"
+#include "OledDisplay.h"
+
+// Constants
+const unsigned long PUBLISH_INTERVAL = 30000;
+const char *CONFIG_FILE = "/config.json";
+const size_t CONFIG_JSON_SIZE = 1024;
+const char *API_URL_PREFIX = "http://139.6.56.197/friends/";
+
+// WIFI Constants
+const int WIFI_MAX_ATTEMPTS = 10;      // Maximum Wifi connection attempts
+const int WIFI_RETRY_DELAY = 500;      // Delay between each attempt
+const int WIFI_CONNECT_TIMEOUT = 5000; // Maximum time to wait for the connection (in ms)
+
+// MDNS Constants
+const int MDNS_MAX_RETRIES = 10;           // Maximum MDNS Retries
+const int MDNS_INITIAL_RETRY_DELAY = 1000; // Initial delay (in ms)
+const float MDNS_BACKOFF_FACTOR = 1.5;     // Backoff factor for exponential delay
+
+// MQTT Constants
+const char *DEFAULT_MQTT_BROKER = "hivemq.dock.moxd.io"; // MQTT Broker Address
+const int DEFAULT_MQTT_PORT = 1883;                      // MQTT Broker Port
 
 // Function Prototypes
 void initializeUUID();
