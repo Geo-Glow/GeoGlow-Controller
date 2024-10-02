@@ -14,6 +14,8 @@
 #include "Controller.h"
 #include <ArduinoJson.h>
 #include <WiFiManager.h>
+#include <Wire.h>
+#include <SeeedOLED.h>
 
 // Constants
 const unsigned long PUBLISH_INTERVAL = 30000;
@@ -418,7 +420,7 @@ void publishStatus()
     httpClient.end();
 }
 
-void ensureNanoleafURL()
+bool ensureNanoleafURL()
 {
     if (strlen(nanoleafBaseUrl) == 0)
     {
@@ -426,12 +428,16 @@ void ensureNanoleafURL()
         if (success)
         {
             Serial.println("NanoLeaf URL wurde gefunden.");
+            return true;
         }
         else
         {
             Serial.println("Nanoleaf URL konnte nicht gefunden werden.");
+            return false;
         }
     }
+    else
+        return true;
 }
 
 void registerNanoleafEvents()
@@ -501,49 +507,106 @@ void userPrompt()
     }
 }
 
+void initOled()
+{
+    Wire.begin();
+    SeeedOled.init();
+    SeeedOled.clearDisplay();
+    SeeedOled.setNormalDisplay();
+    SeeedOled.setPageMode();
+}
+
+void printToOled(char *text, bool clearDisplay = false, int textDelay = 0)
+{
+    const int maxColumns = 16;
+    const int maxRows = 8;
+
+    if (clearDisplay)
+    {
+        SeeedOled.clearDisplay();
+    }
+
+    int row = 0;
+    int col = 0;
+
+    while (*text)
+    {
+        if (col == maxColumns || *text == '\n')
+        {
+            row++;
+            col = 0;
+            if (row == maxRows)
+            {
+                delay(textDelay);
+                SeeedOled.clearDisplay();
+                row = 0;
+            }
+            if (*text == '\n')
+            {
+                text++;
+                continue;
+            }
+        }
+
+        SeeedOled.setTextXY(row, col);
+        SeeedOled.putChar(*text);
+        text++;
+        col++;
+    }
+
+    delay(textDelay);
+    if (clearDisplay)
+    {
+        SeeedOled.clearDisplay();
+    }
+}
+
 void initialSetup()
 {
-    delay(20 * 1000);
-    Serial.println("Sie werden nun durch das Setup geleitet. Sobald Sie bereit sind können wir fortfahren.");
-    userPrompt();
+    bool success = false;
+    initOled();
+    delay(100);
+    printToOled("Setup beginnt in 5 Sekunden.", true, 5000);
 
-    Serial.println("Captive Portal wird aufgesetzt...");
+    Serial.println("Captive Portal wird aufgesetzt.");
+    printToOled("Captive Portal wird aufgesetzt...");
     setupWiFiManager();
-    Serial.print("\n\n");
 
     Serial.println("UUID wird generiert...");
     initializeUUID();
-    Serial.print("\n\n");
 
-    Serial.println("Bitte stellen Sie sicher, dass Ihre Nanoleafs eingesteckt und eingerichtet sind.\nSobald Sie bereit sind können wir fortfahren.");
-    userPrompt();
-    Serial.print("\n\n");
+    Serial.println("Nanoleaf MDNS Lookup");
+
     Serial.println("Die Suche nach der Nanoleaf URL wird gestartet...");
-    ensureNanoleafURL();
-    Serial.print("\n\n");
+    printToOled("Suche Nach Nanoleafs");
+    while (!success)
+    {
+        SeeedOled.setTextXY(7, 0);
+        SeeedOled.putChar('.');
+        delay(500);
+        success = ensureNanoleafURL();
+    }
+    printToOled("Nanoleafs wurden gefunden.", true, 5000);
 
     Serial.println("MQTT Verbindung wird aufgebaut...");
     setupMQTTClient();
-    Serial.print("\n\n");
 
-    Serial.println("Als nächstes wird der Auth Token generiert.\nBitte aktivieren Sie in der NanoLeaf-App die Verbindung zur API,");
-    Serial.println("oder halten sie den Power Button für 5 Sekunden gedrückt (wie in der Anleitung beschrieben). Danach kann fortgefahren werden.");
-    userPrompt();
-    Serial.print("\n\n");
+    Serial.println("Nanoleaf Auth token generation");
+    printToOled("Nanoleaf API aktivieren", true, 10000);
     attemptNanoleafConnection();
-    Serial.print("\n\n");
-
-    Serial.println("Als letzten Schritt müssen Sie ihre friendId in der GeoGlow App eintragen.");
-    Serial.println("Dafür öffnen Sie bitte die App (wie in der Anleitung beschrieben) und tragen folgende ID ein: ");
-    Serial.println("#####    " + String(friendId) + "    #####");
-    userPrompt();
+    printToOled("Nanoleafs erfolgreich verbunden.", true, 5000);
+    SeeedOled.clearDisplay();
+    SeeedOled.setTextXY(0, 0);
+    SeeedOled.putString("FriendID: ");
+    SeeedOled.setTextXY(2, 0);
+    SeeedOled.putString(friendId);
+    delay(60 * 1000);
+    printToOled("Neustart: ", true, 5000);
 
     initialSetupDone = true;
     saveConfigToFile();
-    Serial.print("\n\n");
 
-    Serial.println("Ersteinrichtung abgeschlossen. Der ESP wird in 5 Sekunden neu gestartet...");
-    delay(5000);
+    Serial.println("Ersteinrichtung abgeschlossen. Der ESP wird neu gestartet...");
     ESP.restart();
 }
 

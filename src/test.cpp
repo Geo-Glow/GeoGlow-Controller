@@ -1,50 +1,116 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266MDNS.h>
+/*#include <Wire.h>
+#include <SeeedOLED.h>
 
-// Replace these with your network credentials
-const char* _ssid = "Das tut W-Lan";      //  your network SSID (name)
-const char* pass = "56515768934409322166";       // your network password
-void _setup() {
-  Serial.begin(115200);
-  WiFi.begin(_ssid, pass);
+// Define the maximum number of characters per line and maximum number of lines
+const int maxColumns = 16; // Assume 16 columns (adjust based on your screen width)
+const int maxRows = 8;     // Assume 8 rows (adjust based on your screen height)
 
-  // Wait for connection
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
-
-  if (!MDNS.begin("esp8266")) {
-    Serial.println("Error setting up MDNS responder!");
-    return;
-  }
-  Serial.println("mDNS responder started");
-
-  // Set a timer to trigger the mDNS scan
-  ESP.wdtDisable();  // Disable watchdog timer as scanning might take long
+void initOled()
+{
+  Wire.begin();
+  SeeedOled.init();
+  SeeedOled.clearDisplay();
+  SeeedOled.setNormalDisplay();
+  SeeedOled.setPageMode();
 }
 
-void _loop() {
-  Serial.println("Searching for mDNS services...");
-  MDNS.update();
+void printToOled(const char *text, bool clearDisplay = false, int textDelay = 0)
+{
+  if (clearDisplay)
+  {
+    SeeedOled.clearDisplay();
+  }
 
-  int n = MDNS.queryService("nanoleafapi", "tcp"); // Query for NanoLeaf services
-  Serial.println("mDNS scan done");
+  int row = 0;
+  int col = 0;
 
-  if (n == 0) {
-    Serial.println("No services found");
-  } else {
-    Serial.print(n);
-    Serial.println(" service(s) found:");
-    for (int i = 0; i < n; ++i) {
-      Serial.print("  IP: ");
-      Serial.println(MDNS.answerIP(i));
-      Serial.print("  Port: ");
-      Serial.println(MDNS.answerPort(i));
+  while (*text)
+  {
+    if (col == maxColumns || *text == '\n')
+    {
+      row++;
+      col = 0;
+      if (row == maxRows)
+      {
+        delay(textDelay);
+        SeeedOled.clearDisplay();
+        row = 0;
+      }
+      if (*text == '\n')
+      {
+        text++;
+        continue;
+      }
+    }
+
+    SeeedOled.setTextXY(row, col);
+    SeeedOled.putChar(*text);
+    text++;
+    col++;
+  }
+
+  delay(textDelay);
+  if (clearDisplay)
+  {
+    SeeedOled.clearDisplay();
+  }
+}
+
+void initialSetup()
+{
+  bool success = false;
+  initOled();
+  delay(100);
+  printToOled("Setup beginnt in 5 Sekunden.", true, 5000);
+
+  Serial.println("Captive Portal wird aufgesetzt.");
+  printToOled("Captive Portal wird aufgesetzt...");
+
+  Serial.println("UUID wird generiert...");
+
+  Serial.println("Nanoleaf MDNS Lookup");
+
+  Serial.println("Die Suche nach der Nanoleaf URL wird gestartet...");
+  printToOled("Suche Nach Nanoleafs");
+  int counter = 0;
+  while (!success)
+  {
+    SeeedOled.setTextXY(7, 0); // Move cursor to the last row to display loading dots
+    SeeedOled.putChar('.');
+    delay(500); // Wait a bit before next dot
+    counter++;
+    if (counter == 10)
+    {
+      success = true;
     }
   }
 
-  delay(30000); // Wait 30 seconds before next scan
+  Serial.println("MQTT Verbindung wird aufgebaut...");
+  printToOled("MQTT Verbdg. wird aufgebaut...");
+
+  Serial.println("Nanoleaf Auth token generation");
+  // printToOled("Nanoleaf API aktivieren", true, 10000);
+
+  SeeedOled.clearDisplay();
+  SeeedOled.setTextXY(0, 0);
+  SeeedOled.putString("FriendID: ");
+  SeeedOled.setTextXY(2, 0);
+  SeeedOled.putString("Nick@379435A9"); // Assuming friendId contains the correct string "Nick@79435A9D"
+  delay(60 * 1000);
+  printToOled("Neustart: ");
+
+  Serial.println("Ersteinrichtung abgeschlossen. Der ESP wird neu gestartet...");
+  ESP.restart();
 }
+
+void setup()
+{
+  // Initialize serial communication for debugging
+  Serial.begin(115200);
+  initialSetup();
+}
+
+void loop()
+{
+  // Your main code here
+}*/
