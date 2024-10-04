@@ -2,24 +2,24 @@
 
 bool FileSystemHandler::loadConfigFromFile(const char *path, JsonDocument &jsonDoc, size_t jsonSize)
 {
-    if (!LittleFS.begin())
+    if (!FILESYSTEM.begin())
     {
         Serial.println("Failed to mount FS");
         return false;
     }
 
-    if (!LittleFS.exists(path))
+    if (!FILESYSTEM.exists(path))
     {
         Serial.println("Config file does not exist");
-        LittleFS.end();
+        FILESYSTEM.end();
         return false;
     }
 
-    File configFile = LittleFS.open(path, "r");
+    File configFile = FILESYSTEM.open(path, "r");
     if (!configFile)
     {
         Serial.println("Failed to open config file");
-        LittleFS.end();
+        FILESYSTEM.end();
         return false;
     }
 
@@ -28,14 +28,14 @@ bool FileSystemHandler::loadConfigFromFile(const char *path, JsonDocument &jsonD
     {
         Serial.println("Config file is too large");
         configFile.close();
-        LittleFS.end();
+        FILESYSTEM.end();
         return false;
     }
 
     std::unique_ptr<char[]> buf(new char[size]);
     configFile.readBytes(buf.get(), size);
     configFile.close();
-    LittleFS.end();
+    FILESYSTEM.end();
 
     DeserializationError error = deserializeJson(jsonDoc, buf.get());
     if (error)
@@ -50,17 +50,17 @@ bool FileSystemHandler::loadConfigFromFile(const char *path, JsonDocument &jsonD
 
 bool FileSystemHandler::saveConfigToFile(const char *path, const JsonDocument &jsonDoc)
 {
-    if (!LittleFS.begin())
+    if (!FILESYSTEM.begin())
     {
         Serial.println("Failed to mount FS for save");
         return false;
     }
 
-    File configFile = LittleFS.open(path, "w");
+    File configFile = FILESYSTEM.open(path, "w");
     if (!configFile)
     {
         Serial.println("Failed to open config file for writing");
-        LittleFS.end();
+        FILESYSTEM.end();
         return false;
     }
 
@@ -68,12 +68,12 @@ bool FileSystemHandler::saveConfigToFile(const char *path, const JsonDocument &j
     {
         Serial.println("Failed to write JSON to config file");
         configFile.close();
-        LittleFS.end();
+        FILESYSTEM.end();
         return false;
     }
 
     Serial.println("Config saved successfully");
     configFile.close();
-    LittleFS.end();
+    FILESYSTEM.end();
     return true;
 }

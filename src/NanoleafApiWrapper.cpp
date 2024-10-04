@@ -107,7 +107,8 @@ String NanoleafApiWrapper::generateToken()
     JsonDocument jsonResponse;
     if (sendRequest("POST", "/new", nullptr, &jsonResponse, false))
     {
-        if (const String strPayload = jsonResponse["auth_token"]; strPayload != nullptr && strPayload != "null")
+        const String strPayload = jsonResponse["auth_token"];
+        if (strPayload != nullptr && strPayload != "null")
         {
             return strPayload;
         }

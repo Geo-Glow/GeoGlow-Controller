@@ -387,30 +387,6 @@ void publishInitialHeartbeat()
     }
 }
 
-void userPrompt()
-{
-    Serial.println("Bitte geben Sie 'y' ein um fortzufahren.");
-
-    while (true)
-    {
-        if (Serial.available() > 0)
-        {
-            char input = Serial.read();
-
-            if (input == 'y' || input == 'Y')
-            {
-                Serial.println("Vielen Dank. Das Setup wird nun fortgesetzt...");
-                break;
-            }
-            else
-            {
-                Serial.println("Ungültige Eingabe. Bitte geben Sie 'y' ein um fortzufahren.");
-            }
-        }
-        delay(500);
-    }
-}
-
 void initialSetup()
 {
     bool success = false;

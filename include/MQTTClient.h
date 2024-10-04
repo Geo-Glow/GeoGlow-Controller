@@ -1,13 +1,19 @@
 #ifndef MQTTCLIENT_H
 #define MQTTCLIENT_H
 
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
+#else
+#include <WiFi.h>
+#endif
+
 #include <PubSubClient.h>
 #include <vector>
 #include <ArduinoJson.h>
 #include "TopicAdapter.h"
 
-class MQTTClient {
+class MQTTClient
+{
 public:
     explicit MQTTClient(WiFiClient &wifiClient);
 
@@ -33,7 +39,7 @@ private:
     PubSubClient client;
     String friendId;
     static std::vector<TopicAdapter *> topicAdapters;
-    static MQTTClient* instance;
+    static MQTTClient *instance;
 };
 
 #endif // MQTTCLIENT_H

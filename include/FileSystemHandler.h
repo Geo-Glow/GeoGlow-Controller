@@ -3,7 +3,14 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+
+#if defined(ESP8266)
 #include <LittleFS.h>
+#define FILESYSTEM LittleFS
+#elif defined(ESP32)
+#include <LITTLEFS.h>
+#define FILESYSTEM LITTLEFS
+#endif
 
 class FileSystemHandler
 {
