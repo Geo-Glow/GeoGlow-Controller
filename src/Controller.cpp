@@ -169,7 +169,7 @@ bool generateMDNSNanoleafURL()
 
 void loadConfigFromFile()
 {
-    StaticJsonDocument<CONFIG_JSON_SIZE> jsonConfig;
+    JsonDocument jsonConfig;
     if (!FileSystemHandler::loadConfigFromFile(CONFIG_FILE, jsonConfig, CONFIG_JSON_SIZE))
     {
         return;
@@ -189,7 +189,7 @@ void loadConfigFromFile()
 
 void saveConfigToFile()
 {
-    StaticJsonDocument<CONFIG_JSON_SIZE> jsonConfig;
+    JsonDocument jsonConfig;
     jsonConfig["ssid"] = ssid;
     jsonConfig["password"] = password;
     jsonConfig["nanoleafAuthToken"] = nanoleafAuthToken;
@@ -292,11 +292,11 @@ void publishHeartbeat()
 
 void publishStatus()
 {
-    StaticJsonDocument<200> jsonPayload;
+    JsonDocument jsonPayload;
     jsonPayload["friendId"] = friendId;
     jsonPayload["name"] = name;
     jsonPayload["groupId"] = groupId;
-    JsonArray tileIds = jsonPayload.createNestedArray("tileIds");
+    JsonArray tileIds = jsonPayload["tileIds"].to<JsonArray>();
 
     for (const String &panelId : nanoleaf.getPanelIds())
     {
