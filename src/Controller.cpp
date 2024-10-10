@@ -206,6 +206,16 @@ void saveConfigToFile()
     }
 }
 
+void generateNanoleafToken()
+{
+    String newToken = nanoleaf.generateToken();
+    if (!newToken.isEmpty())
+    {
+        newToken.toCharArray(nanoleafAuthToken, sizeof(nanoleafAuthToken));
+        nanoleaf.setup(nanoleafBaseUrl, nanoleafAuthToken);
+    }
+}
+
 void attemptNanoleafConnection()
 {
     nanoleaf.setup(nanoleafBaseUrl, nanoleafAuthToken);
@@ -219,13 +229,7 @@ void attemptNanoleafConnection()
 
         if (!nanoleaf.isConnected())
         {
-            String newToken = nanoleaf.generateToken();
-            if (!newToken.isEmpty())
-            {
-                newToken.toCharArray(nanoleafAuthToken, sizeof(nanoleafAuthToken));
-                nanoleaf.setup(nanoleafBaseUrl, nanoleafAuthToken);
-                shouldSaveConfig = true;
-            }
+            generateNanoleafToken();
         }
         attempts++;
     }
@@ -332,6 +336,7 @@ bool ensureNanoleafURL()
         if (success)
         {
             Serial.println("NanoLeaf URL wurde gefunden.");
+            nanoleaf.setup(nanoleafBaseUrl, nanoleafAuthToken);
             return true;
         }
         else
@@ -387,47 +392,57 @@ void publishInitialHeartbeat()
     }
 }
 
+void blink_led(int blinkDelay)
+{
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(blinkDelay);
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(blinkDelay);
+}
+
 void initialSetup()
 {
     bool success = false;
-    oledDisplay.init();
-    delay(100);
-    oledDisplay.printToOled("Setup beginnt in 5 Sekunden.", true, 5000);
 
     Serial.println("Captive Portal wird aufgesetzt.");
-    oledDisplay.printToOled("Captive Portal wird aufgesetzt...");
     setupWiFiManager();
 
     Serial.println("UUID wird generiert...");
     initializeUUID();
 
     Serial.println("Nanoleaf MDNS Lookup");
-
-    Serial.println("Die Suche nach der Nanoleaf URL wird gestartet...");
-    oledDisplay.printToOled("Suche Nach Nanoleafs");
+    unsigned long now = millis();
+    unsigned long then = millis();
+    // While not successfull and not longer ago than 60 Seconds
     while (!success)
     {
-        SeeedOled.setTextXY(7, 0);
-        SeeedOled.putChar('.');
-        delay(500);
         success = ensureNanoleafURL();
+        then = millis();
+
+        // If still not successfull after 60 seconds
+        // blink led slow to indicate problem
+        if (then - now > (60 * 1000))
+        {
+            for (int i = 0; i < 20; i++)
+            {
+                blink_led(2000);
+            }
+            now = millis();
+            then = millis();
+        }
     }
-    oledDisplay.printToOled("Nanoleafs wurden gefunden.", true, 5000);
 
     Serial.println("MQTT Verbindung wird aufgebaut...");
     setupMQTTClient();
 
-    Serial.println("Nanoleaf Auth token generation");
-    oledDisplay.printToOled("Nanoleaf API aktivieren", true, 10000);
-    attemptNanoleafConnection();
-    oledDisplay.printToOled("Nanoleafs erfolgreich verbunden.", true, 5000);
-    SeeedOled.clearDisplay();
-    SeeedOled.setTextXY(0, 0);
-    SeeedOled.putString("FriendID: ");
-    SeeedOled.setTextXY(2, 0);
-    SeeedOled.putString(friendId);
-    delay(60 * 1000);
-    oledDisplay.printToOled("Neustart: ", true, 5000);
+    Serial.println("Generating Auth token");
+    while (!nanoleaf.isConnected())
+    {
+        // Blink LED fast while generating the token
+        blink_led(500);
+        generateNanoleafToken();
+        delay(500);
+    }
 
     initialSetupDone = true;
     saveConfigToFile();
@@ -439,6 +454,11 @@ void initialSetup()
 void setup()
 {
     Serial.begin(115200);
+
+    // Initialize onboard led and turn off
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, LOW);
+
     loadConfigFromFile();
 
     if (!initialSetupDone)

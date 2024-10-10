@@ -134,7 +134,6 @@ bool NanoleafApiWrapper::registerEvents(const std::vector<int> &eventIds)
         String fullUrl = this->nanoleafBaseUrl + "/api/v1/" + this->nanoleafAuthToken + url;
         httpClient.begin(client, fullUrl);
         httpClient.addHeader("Content-Type", "text/event-stream");
-
         int httpResponseCode = httpClient.GET();
         if (httpResponseCode == HTTP_CODE_OK)
         {
