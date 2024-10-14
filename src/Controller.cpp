@@ -19,7 +19,7 @@ char nanoleafBaseUrl[55] = "";   // NanoLeaf Baseurl (http://<ip>:<port>)
 char nanoleafAuthToken[33] = ""; // Nanoleaf Auth Token
 
 // Setup Vars
-char friendId[45] = "";
+char friendId[4] = "";
 char name[36] = "";
 char groupId[36] = "";
 
@@ -28,6 +28,10 @@ unsigned long lastPublishTime = 0;
 bool shouldSaveConfig = false;
 bool layoutChanged = false;
 bool initialSetupDone = false;
+
+#if defined(ESP32)
+#define LED_BUILTIN 2
+#endif
 
 void connectToWifi(bool useSavedCredentials)
 {
@@ -68,9 +72,11 @@ void setupWiFiManager()
 
     WiFiManagerParameter customGroupId("groupId", "Group ID", groupId, 36);
     WiFiManagerParameter customName("name", "Name", name, 36);
+    WiFiManagerParameter customFriendId("friendId", "FriendID", friendId, 4);
 
     wifiManager.addParameter(&customGroupId);
     wifiManager.addParameter(&customName);
+    wifiManager.addParameter(&customFriendId);
 
     if (!wifiManager.autoConnect("GeoGlow"))
     {
@@ -85,6 +91,7 @@ void setupWiFiManager()
     strncpy(password, WiFi.psk().c_str(), sizeof(password) - 1);
     strncpy(groupId, customGroupId.getValue(), sizeof(groupId) - 1);
     strncpy(name, customName.getValue(), sizeof(name) - 1);
+    strncpy(friendId, customFriendId.getValue(), sizeof(friendId) - 1);
 
     // Checks to prevent buffer overflow
     if (strlen(groupId) >= sizeof(groupId) - 1)
@@ -108,14 +115,6 @@ void generateShortUUID(char *uuid, size_t length)
         uuid[i] = hexChars[random(16)];
     }
     uuid[length - 1] = '\0';
-}
-
-void initializeUUID()
-{
-    char shortUUID[9];
-    generateShortUUID(shortUUID, sizeof(shortUUID));
-    snprintf(friendId, sizeof(friendId), "%s@%s", name, shortUUID);
-    Serial.println("Initialized UUID.");
 }
 
 bool generateMDNSNanoleafURL()
@@ -407,9 +406,6 @@ void initialSetup()
     Serial.println("Captive Portal wird aufgesetzt.");
     setupWiFiManager();
 
-    Serial.println("UUID wird generiert...");
-    initializeUUID();
-
     Serial.println("Nanoleaf MDNS Lookup");
     unsigned long now = millis();
     unsigned long then = millis();
@@ -441,10 +437,10 @@ void initialSetup()
         // Blink LED fast while generating the token
         blink_led(500);
         generateNanoleafToken();
-        delay(500);
     }
 
     initialSetupDone = true;
+    digitalWrite(LED_BUILTIN, LOW);
     saveConfigToFile();
 
     Serial.println("Ersteinrichtung abgeschlossen. Der ESP wird neu gestartet...");
