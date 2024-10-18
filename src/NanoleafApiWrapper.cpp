@@ -173,6 +173,11 @@ void NanoleafApiWrapper::setLayoutChangeCallback(LayoutChangeCallback callback)
     this->layoutChangeCallback = callback;
 }
 
+void NanoleafApiWrapper::setColorCallback(ColorCallback callback)
+{
+    this->colorCallback = callback;
+}
+
 bool NanoleafApiWrapper::identify()
 {
     return sendRequest("PUT", "/identify", nullptr, nullptr, true);
@@ -234,9 +239,13 @@ bool NanoleafApiWrapper::setStaticColors(const JsonObject &doc)
 
         auto rgb = kv.value().as<JsonArray>();
 
-        animData += tileId + " 2 " + String(rgb[0].as<int>()) + " " + String(rgb[1].as<int>()) + " " +
-                    String(rgb[2].as<int>()) + " 0 " + String(10 * 360) + " 0 0 0 0 360 ";
+        // animData += tileId + " 2 " + String(rgb[0].as<int>()) + " " + String(rgb[1].as<int>()) + " " +
+        //            String(rgb[2].as<int>()) + " 0 " + String(10 * 360) + " 0 0 0 0 360 ";
+        animData += tileId + " 2 " + "0 0 0 0 30 " + String(rgb[0].as<int>()) + " " + String(rgb[1].as<int>()) + " " +
+                    String(rgb[2].as<int>()) + " 0 50 ";
     }
+
+    Serial.println(animData);
 
     for (const auto &triangleId : triangleIds)
     {
@@ -255,5 +264,6 @@ bool NanoleafApiWrapper::setStaticColors(const JsonObject &doc)
     jsonPayload["write"]["palette"].add(JsonObject());
     jsonPayload["write"]["palette"][0]["hue"] = 0;
 
+    this->colorCallback();
     return sendRequest("PUT", "/effects", &jsonPayload, nullptr, true);
 }

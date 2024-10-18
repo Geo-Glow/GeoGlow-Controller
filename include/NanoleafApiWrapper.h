@@ -31,14 +31,15 @@ public:
 
     bool setPower(const bool &state);
 
-    bool setStaticColors(const JsonObject &doc);
-
     bool registerEvents(const std::vector<int> &eventIds);
 
     void processEvents();
 
     typedef std::function<void()> LayoutChangeCallback;
+    typedef std::function<void()> ColorCallback;
     void setLayoutChangeCallback(LayoutChangeCallback callback);
+    void setColorCallback(ColorCallback callback);
+    bool setStaticColors(const JsonObject &doc);
 
 private:
     bool sendRequest(
@@ -56,6 +57,7 @@ private:
     WiFiClient *eventClient;
     bool registeredForEvents = false;
     LayoutChangeCallback layoutChangeCallback;
+    ColorCallback colorCallback;
 };
 
 #endif

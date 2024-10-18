@@ -19,7 +19,7 @@ char nanoleafBaseUrl[55] = "";   // NanoLeaf Baseurl (http://<ip>:<port>)
 char nanoleafAuthToken[33] = ""; // Nanoleaf Auth Token
 
 // Setup Vars
-char friendId[4] = "";
+char friendId[36] = "";
 char name[36] = "";
 char groupId[36] = "";
 
@@ -28,6 +28,8 @@ unsigned long lastPublishTime = 0;
 bool shouldSaveConfig = false;
 bool layoutChanged = false;
 bool initialSetupDone = false;
+unsigned long lastColorTime = 0;
+bool currentlyShowingCustomColor = false;
 
 #if defined(ESP32)
 #define LED_BUILTIN 2
@@ -67,12 +69,12 @@ void connectToWifi(bool useSavedCredentials)
 
 void setupWiFiManager()
 {
-    wifiManager.setDebugOutput(false); // Disable the debug output to keep Serial clean
+    wifiManager.setDebugOutput(true); // Disable the debug output to keep Serial clean
     wifiManager.setSaveConfigCallback(saveConfigCallback);
 
     WiFiManagerParameter customGroupId("groupId", "Group ID", groupId, 36);
     WiFiManagerParameter customName("name", "Name", name, 36);
-    WiFiManagerParameter customFriendId("friendId", "FriendID", friendId, 4);
+    WiFiManagerParameter customFriendId("friendId", "FriendID", friendId, 36);
 
     wifiManager.addParameter(&customGroupId);
     wifiManager.addParameter(&customName);
@@ -428,8 +430,8 @@ void initialSetup()
         }
     }
 
-    Serial.println("MQTT Verbindung wird aufgebaut...");
-    setupMQTTClient();
+    /*Serial.println("MQTT Verbindung wird aufgebaut...");
+    setupMQTTClient();*/
 
     Serial.println("Generating Auth token");
     while (!nanoleaf.isConnected())
@@ -440,11 +442,17 @@ void initialSetup()
     }
 
     initialSetupDone = true;
-    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(LED_BUILTIN, HIGH);
     saveConfigToFile();
 
     Serial.println("Ersteinrichtung abgeschlossen. Der ESP wird neu gestartet...");
     ESP.restart();
+}
+
+void colorCallback()
+{
+    lastColorTime = millis();
+    currentlyShowingCustomColor = true;
 }
 
 void setup()
@@ -453,7 +461,7 @@ void setup()
 
     // Initialize onboard led and turn off
     pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(LED_BUILTIN, HIGH);
 
     loadConfigFromFile();
 
@@ -467,6 +475,7 @@ void setup()
     ensureNanoleafURL();
     setupMQTTClient();
     attemptNanoleafConnection();
+    nanoleaf.setColorCallback(colorCallback);
     publishStatus();
     publishInitialHeartbeat();
 }
@@ -475,6 +484,13 @@ void loop()
 {
     mqttClient.loop();
     nanoleaf.processEvents();
+    unsigned long now = millis();
+
+    if (now - lastColorTime >= 20000 && currentlyShowingCustomColor)
+    {
+        nanoleaf.setPower(false);
+        currentlyShowingCustomColor = false;
+    }
 
     if (layoutChanged)
     {
@@ -482,9 +498,9 @@ void loop()
         layoutChanged = false;
     }
 
-    if (millis() - lastPublishTime >= PUBLISH_INTERVAL)
+    if (now - lastPublishTime >= PUBLISH_INTERVAL)
     {
         publishHeartbeat();
-        lastPublishTime = millis();
+        lastPublishTime = now;
     }
 }
