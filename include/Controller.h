@@ -24,7 +24,6 @@
 #include "NanoleafApiWrapper.h"
 #include "ColorPaletteAdapter.h"
 #include "FileSystemHandler.h"
-#include "OledDisplay.h"
 
 // Constants
 const unsigned long PUBLISH_INTERVAL = 30000;

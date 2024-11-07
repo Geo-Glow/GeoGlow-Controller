@@ -8,7 +8,6 @@ HTTPClient httpClient;
 MQTTClient mqttClient(wifiClientForMQTT);
 NanoleafApiWrapper nanoleaf(wifiClientForMQTT);
 ColorPaletteAdapter colorPaletteAdapter(nanoleaf);
-OledDisplay oledDisplay;
 
 // Wi-Fi credentials
 char ssid[32];     // Wifi SSID
