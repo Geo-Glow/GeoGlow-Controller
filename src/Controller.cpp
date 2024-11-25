@@ -69,17 +69,18 @@ void connectToWifi(bool useSavedCredentials)
 void setupWiFiManager()
 {
     wifiManager.setDebugOutput(true); // Disable the debug output to keep Serial clean
+    wifiManager.setTitle("PalPalette Controller Konfigurator");
     wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-    WiFiManagerParameter customGroupId("groupId", "Group ID", groupId, 36);
+    WiFiManagerParameter customGroupId("groupId", "Gruppen ID", groupId, 36);
     WiFiManagerParameter customName("name", "Name", name, 36);
-    WiFiManagerParameter customFriendId("friendId", "FriendID", friendId, 36);
+    WiFiManagerParameter customFriendId("friendId", "Freundes ID", friendId, 36);
 
     wifiManager.addParameter(&customGroupId);
     wifiManager.addParameter(&customName);
     wifiManager.addParameter(&customFriendId);
 
-    if (!wifiManager.autoConnect("GeoGlow"))
+    if (!wifiManager.autoConnect("PalPalette"))
     {
         Serial.println("Failed to connect via WiFi Manager and hit timeout");
         delay(3000);
@@ -444,6 +445,8 @@ void initialSetup()
     digitalWrite(LED_BUILTIN, HIGH);
     saveConfigToFile();
 
+    const int red[] = {255, 0, 0};
+    nanoleaf.setStaticColor(red);
     Serial.println("Ersteinrichtung abgeschlossen. Der ESP wird neu gestartet...");
     ESP.restart();
 }
@@ -485,7 +488,7 @@ void loop()
     nanoleaf.processEvents();
     unsigned long now = millis();
 
-    if (now - lastColorTime >= 20000 && currentlyShowingCustomColor)
+    if (now - lastColorTime >= 360000 && currentlyShowingCustomColor)
     {
         nanoleaf.setPower(false);
         currentlyShowingCustomColor = false;

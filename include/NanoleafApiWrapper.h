@@ -40,6 +40,7 @@ public:
     void setLayoutChangeCallback(LayoutChangeCallback callback);
     void setColorCallback(ColorCallback callback);
     bool setStaticColors(const JsonObject &doc);
+    void setStaticColor(const int rgb[3]);
 
 private:
     bool sendRequest(

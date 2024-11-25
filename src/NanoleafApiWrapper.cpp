@@ -224,6 +224,42 @@ bool NanoleafApiWrapper::setPower(const bool &state)
     return sendRequest("PUT", "/state", &jsonPayload, nullptr, true);
 }
 
+void NanoleafApiWrapper::setStaticColor(const int rgb[3])
+{
+    const char *jsonPayload = R"(
+        {
+            "write": {
+                "command": "display",
+                "animType": "solid",
+                "palette": [
+                    {
+                        "hue": 0,
+                        "saturation": 100,
+                        "brightness": 100
+                    }
+                ],
+                "colorType": "HSB"
+            }
+        }
+    )";
+    JsonDocument payload;
+    DeserializationError error = deserializeJson(payload, jsonPayload);
+    if (error)
+    {
+        Serial.print("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        return;
+    }
+
+    for (int i = 0; i < 3; i++)
+    {
+        sendRequest("PUT", "/effects", &payload, nullptr, true);
+        delay(1000);
+        this->setPower(false);
+        delay(1000);
+    }
+}
+
 bool NanoleafApiWrapper::setStaticColors(const JsonObject &doc)
 {
     String animData = "";
@@ -244,8 +280,6 @@ bool NanoleafApiWrapper::setStaticColors(const JsonObject &doc)
         animData += tileId + " 2 " + "0 0 0 0 30 " + String(rgb[0].as<int>()) + " " + String(rgb[1].as<int>()) + " " +
                     String(rgb[2].as<int>()) + " 0 50 ";
     }
-
-    Serial.println(animData);
 
     for (const auto &triangleId : triangleIds)
     {
