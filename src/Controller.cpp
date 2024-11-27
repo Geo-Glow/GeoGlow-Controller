@@ -36,6 +36,11 @@ bool currentlyShowingCustomColor = false;
 static unsigned long resetBtnStartTime = 0;
 static bool resetBtnWasPressed = false;
 
+// Layout Publish Mode
+#define ONEVENTS 0                // Layout will be published using events (only when layout changes)
+#define ONHEARTBEAT 1             // Layout will be published each heartbeat (fallback if events are not working)
+int publishLayoutMode = ONEVENTS; // ONEVENTS should be the default, ONHEARTBEAT is just the fallback
+
 #if defined(ESP32)
 #define LED_BUILTIN 2
 #endif
@@ -406,8 +411,9 @@ void registerNanoleafEvents()
 
     if (!success)
     {
-        Serial.println("Event registration failed after maximum retries. Restarting ESP.");
-        ESP.restart();
+        Serial.println("Event registration failed after maximum retries. Setting publishLayoutMode to ONHEARTBEAT.");
+        publishLayoutMode = ONHEARTBEAT;
+        return;
     }
 
     Serial.println("Nanoleaf events registered.");
@@ -544,7 +550,16 @@ void loop()
 
     if (now - lastPublishTime >= PUBLISH_INTERVAL)
     {
-        publishHeartbeat();
+        // If publish mode is on heartbeat, publish layout every heartbeat
+        if (publishLayoutMode == ONHEARTBEAT)
+        {
+            publishStatus();
+        }
+        else // just publish the heartbeat itself
+        {
+            publishHeartbeat();
+        }
+
         lastPublishTime = now;
     }
 }
