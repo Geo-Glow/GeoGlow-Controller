@@ -17,6 +17,7 @@ class FileSystemHandler
 public:
     static bool loadConfigFromFile(const char *path, JsonDocument &jsonDoc, size_t jsonSize);
     static bool saveConfigToFile(const char *path, const JsonDocument &jsonDoc);
+    static bool removeConfigFile(const char *path);
 };
 
 #endif // FILESYSTEMHANDLER_H

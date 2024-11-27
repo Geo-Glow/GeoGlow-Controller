@@ -1,5 +1,31 @@
 #include "FileSystemHandler.h"
 
+bool FileSystemHandler::removeConfigFile(const char *path)
+{
+    if (!FILESYSTEM.begin())
+    {
+        Serial.println("Failed to mount FS for delete");
+        return false;
+    }
+    if (FILESYSTEM.exists(path))
+    {
+        if (!FILESYSTEM.remove(path))
+        {
+            Serial.println("Failed to delete config file");
+            FILESYSTEM.end();
+            return false;
+        }
+        Serial.println("Config file deleted");
+    }
+    else
+    {
+        Serial.println("Config file does not exist");
+    }
+
+    FILESYSTEM.end();
+    return true;
+}
+
 bool FileSystemHandler::loadConfigFromFile(const char *path, JsonDocument &jsonDoc, size_t jsonSize)
 {
     if (!FILESYSTEM.begin())

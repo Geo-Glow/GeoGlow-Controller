@@ -14,78 +14,77 @@ void NanoleafApiWrapper::setup(const char *nanoleafBaseUrl, const char *nanoleaf
 bool NanoleafApiWrapper::sendRequest(const String &method, const String &endpoint, const JsonDocument *requestBody,
                                      JsonDocument *responseBody, const bool useAuthToken)
 {
-    if (WiFi.status() == WL_CONNECTED)
+    if (WiFi.status() != WL_CONNECTED)
     {
-        HTTPClient http;
-        String url = nanoleafBaseUrl;
+        Serial.println("WiFi Disconnected");
+        return false;
+    }
+    HTTPClient http;
+    String url = nanoleafBaseUrl;
 
-        if (useAuthToken)
+    if (useAuthToken)
+    {
+        url += "/api/v1/" + nanoleafAuthToken;
+    }
+    else
+    {
+        url += "/api/v1";
+    }
+
+    url += endpoint;
+
+    http.begin(client, url);
+    http.addHeader("Content-Type", "application/json");
+
+    int httpResponseCode = -1;
+
+    if (method.equalsIgnoreCase("GET"))
+    {
+        httpResponseCode = http.GET();
+    }
+    else if (method.equalsIgnoreCase("POST"))
+    {
+        if (requestBody != nullptr)
         {
-            url += "/api/v1/" + nanoleafAuthToken;
+            String stringPayload;
+            serializeJson(*requestBody, stringPayload);
+            httpResponseCode = http.POST(stringPayload);
         }
         else
         {
-            url += "/api/v1";
+            httpResponseCode = http.POST("");
         }
-
-        url += endpoint;
-
-        http.begin(client, url);
-        http.addHeader("Content-Type", "application/json");
-
-        int httpResponseCode = -1;
-
-        if (method.equalsIgnoreCase("GET"))
-        {
-            httpResponseCode = http.GET();
-        }
-        else if (method.equalsIgnoreCase("POST"))
-        {
-            if (requestBody != nullptr)
-            {
-                String stringPayload;
-                serializeJson(*requestBody, stringPayload);
-                httpResponseCode = http.POST(stringPayload);
-            }
-            else
-            {
-                httpResponseCode = http.POST("");
-            }
-        }
-        else if (method.equalsIgnoreCase("PUT"))
-        {
-            if (requestBody != nullptr)
-            {
-                String stringPayload;
-                serializeJson(*requestBody, stringPayload);
-                httpResponseCode = http.PUT(stringPayload);
-            }
-            else
-            {
-                httpResponseCode = http.PUT("");
-            }
-        }
-
-        if (httpResponseCode > 0)
-        {
-            String response = http.getString();
-
-            if (responseBody != nullptr)
-            {
-                deserializeJson(*responseBody, response);
-            }
-
-            http.end();
-            return true;
-        }
-        Serial.print("Error on sending ");
-        Serial.print(method);
-        Serial.print(": ");
-        Serial.println(httpResponseCode);
-        http.end();
-        return false;
     }
-    Serial.println("WiFi Disconnected");
+    else if (method.equalsIgnoreCase("PUT"))
+    {
+        if (requestBody != nullptr)
+        {
+            String stringPayload;
+            serializeJson(*requestBody, stringPayload);
+            httpResponseCode = http.PUT(stringPayload);
+        }
+        else
+        {
+            httpResponseCode = http.PUT("");
+        }
+    }
+
+    if (httpResponseCode > 0)
+    {
+        String response = http.getString();
+        if (responseBody != nullptr)
+        {
+            deserializeJson(*responseBody, response);
+        }
+
+        http.end();
+        return true;
+    }
+    Serial.print("Error on sending ");
+    Serial.print(method);
+    Serial.print(": ");
+    Serial.println(httpResponseCode);
+    http.end();
     return false;
 }
 

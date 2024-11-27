@@ -30,9 +30,41 @@ bool initialSetupDone = false;
 unsigned long lastColorTime = 0;
 bool currentlyShowingCustomColor = false;
 
+// Reset Logic
+#define RESET_BTN_PIN 0      // Flash Button Pin
+#define LONG_PRESS_TIME 3000 // Milliseconds (3 sec)
+static unsigned long resetBtnStartTime = 0;
+static bool resetBtnWasPressed = false;
+
 #if defined(ESP32)
 #define LED_BUILTIN 2
 #endif
+
+bool resetBtnLongPress()
+{
+    int buttonState = digitalRead(RESET_BTN_PIN);
+
+    if (buttonState == LOW)
+    { // Button Pressed (low because of pullup)
+        if (!resetBtnWasPressed)
+        {
+            resetBtnWasPressed = true;
+            resetBtnStartTime = millis();
+        }
+    }
+    else
+    {
+        resetBtnWasPressed = false;
+    }
+
+    if (resetBtnWasPressed && (millis() - resetBtnStartTime >= LONG_PRESS_TIME))
+    {
+        resetBtnWasPressed = false;
+        return true;
+    }
+
+    return false;
+}
 
 void connectToWifi(bool useSavedCredentials)
 {
@@ -368,7 +400,7 @@ void registerNanoleafEvents()
         else
         {
             Serial.printf("Event registration failed, attempt %d/%d\n", attempt, maxRetries);
-            delay(100);
+            delay(1000);
         }
     }
 
@@ -460,10 +492,12 @@ void colorCallback()
 void setup()
 {
     Serial.begin(115200);
-
     // Initialize onboard led and turn off
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
+
+    // Set Pin Mode for Reset button
+    pinMode(RESET_BTN_PIN, INPUT_PULLUP);
 
     loadConfigFromFile();
 
@@ -475,16 +509,24 @@ void setup()
     // loadConfigFromFile();
     connectToWifi(true);
     ensureNanoleafURL();
-    setupMQTTClient();
+    // setupMQTTClient();
     attemptNanoleafConnection();
     nanoleaf.setColorCallback(colorCallback);
-    publishStatus();
-    publishInitialHeartbeat();
+    // publishStatus();
+    // publishInitialHeartbeat();
 }
 
 void loop()
 {
-    mqttClient.loop();
+    if (resetBtnLongPress())
+    {
+        Serial.println("Resetting!");
+        wifiManager.erase();
+        delay(3000);
+        FileSystemHandler::removeConfigFile(CONFIG_FILE);
+        ESP.restart();
+    }
+    // mqttClient.loop();
     nanoleaf.processEvents();
     unsigned long now = millis();
 
