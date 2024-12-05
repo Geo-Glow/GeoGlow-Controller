@@ -1,3 +1,5 @@
+_The App (Android) will be available soon. There are some small details that still need to be sorted out before the Repository can be made public._
+
 # GeoGlow Controller
 
 _(english Version below)_
