@@ -59,4 +59,7 @@ void connectToWifi();
 void generateShortUUID(char *uuid, size_t length);
 void connectToWifi(bool useSavedCredentials = true);
 void registerNanoleafEvents();
+void performReset();
+bool resetBtnLongPress();
+void IRAM_ATTR handleResetInterrupt();
 #endif // CONTROLLER_H

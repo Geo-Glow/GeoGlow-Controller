@@ -33,8 +33,7 @@ bool currentlyShowingCustomColor = false;
 // Reset Logic
 #define RESET_BTN_PIN 0      // Flash Button Pin
 #define LONG_PRESS_TIME 3000 // Milliseconds (3 sec)
-static unsigned long resetBtnStartTime = 0;
-static bool resetBtnWasPressed = false;
+volatile unsigned long buttonPressStartTime = 0;
 
 // Layout Publish Mode
 #define ONEVENTS 0                // Layout will be published using events (only when layout changes)
@@ -45,30 +44,27 @@ int publishLayoutMode = ONEVENTS; // ONEVENTS should be the default, ONHEARTBEAT
 #define LED_BUILTIN 2
 #endif
 
-bool resetBtnLongPress()
+void performReset()
 {
-    int buttonState = digitalRead(RESET_BTN_PIN);
+    wifiManager.erase();
+    FileSystemHandler::removeConfigFile(CONFIG_FILE);
+    ESP.restart();
+}
 
-    if (buttonState == LOW)
-    { // Button Pressed (low because of pullup)
-        if (!resetBtnWasPressed)
-        {
-            resetBtnWasPressed = true;
-            resetBtnStartTime = millis();
-        }
+// Interrupt Handler - This way the reset can be done no matter what the controller is executing currently
+void IRAM_ATTR handleResetInterrupt()
+{
+    if (digitalRead(RESET_BTN_PIN) == LOW)
+    {
+        buttonPressStartTime = millis();
     }
     else
     {
-        resetBtnWasPressed = false;
+        if (millis() - buttonPressStartTime >= LONG_PRESS_TIME)
+        {
+            performReset();
+        }
     }
-
-    if (resetBtnWasPressed && (millis() - resetBtnStartTime >= LONG_PRESS_TIME))
-    {
-        resetBtnWasPressed = false;
-        return true;
-    }
-
-    return false;
 }
 
 void connectToWifi(bool useSavedCredentials)
@@ -504,6 +500,7 @@ void setup()
 
     // Set Pin Mode for Reset button
     pinMode(RESET_BTN_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(RESET_BTN_PIN), handleResetInterrupt, CHANGE);
 
     loadConfigFromFile();
 
@@ -515,24 +512,16 @@ void setup()
     // loadConfigFromFile();
     connectToWifi(true);
     ensureNanoleafURL();
-    // setupMQTTClient();
+    setupMQTTClient();
     attemptNanoleafConnection();
     nanoleaf.setColorCallback(colorCallback);
-    // publishStatus();
-    // publishInitialHeartbeat();
+    publishStatus();
+    publishInitialHeartbeat();
 }
 
 void loop()
 {
-    if (resetBtnLongPress())
-    {
-        Serial.println("Resetting!");
-        wifiManager.erase();
-        delay(3000);
-        FileSystemHandler::removeConfigFile(CONFIG_FILE);
-        ESP.restart();
-    }
-    // mqttClient.loop();
+    mqttClient.loop();
     nanoleaf.processEvents();
     unsigned long now = millis();
 
