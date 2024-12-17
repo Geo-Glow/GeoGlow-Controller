@@ -1,10 +1,10 @@
 _The App (Android) will be available soon. There are some small details that still need to be sorted out before the Repository can be made public._
 
-# GeoGlow Controller
+# PalPalette Controller
 
 _(english Version below)_
 
-Der GeoGlow Controller ist dafür zuständig, die Verbindung zwischen der GeoGlow App und den Nanoleafs herzustellen. Die von Nanoleaf bereitgestellte API ist nur lokal zu erreichen. Daher benötigt jeder Freund einen GeoGlow Controller, der sich im selben Netzwerk wie die Nanoleafs befindet.
+Der PalPalette Controller ist dafür zuständig, die Verbindung zwischen der PalPalette App und den Nanoleafs herzustellen. Die von Nanoleaf bereitgestellte API ist nur lokal zu erreichen. Daher benötigt jeder Freund einen PalPalette Controller, der sich im selben Netzwerk wie die Nanoleafs befindet.
 
 Der Controller übernimmt nun mehrere Aufgaben:
 
@@ -12,7 +12,7 @@ Der Controller übernimmt nun mehrere Aufgaben:
 2. Ping an das Backend: Es wird in regelmäßigen Abständen ein Ping an das Backend gesendet, um zu signalisieren, dass der Controller und somit der Freund erreichbar ist.
 3. Farbenübertragung über MQTT: Über MQTT erhält der Controller die von Freunden versendeten Farben. Diese werden vom Controller verarbeitet und an die Nanoleaf API weitergeleitet, um die Paneele aufleuchten zu lassen.
 
-## Aufsetzen des GeoGlow Controllers
+## Aufsetzen des PalPalette Controllers
 
 _In der aktuellen Projektphase werden die Controller mit bereits aufgespieltem Code verschickt. Daher ist es nicht notwendig, Schritte zu unternehmen, um den Code auf die Controller zu laden._
 
@@ -49,9 +49,9 @@ Damit der Controller in Betrieb genommen werden kann, sind folgende Schritte not
 - Der Controller findet die IP-Adresse der Nanoleafs nicht.
   - Stellen Sie sicher, dass die Nanoleafs korrekt mit dem Netzwerk verbunden sind. Ein Neustart der Geräte kann in einigen Fällen helfen.
 
-# GeoGlow Controller
+# PalPalette Controller
 
-The GeoGlow Controller is responsible for establishing the connection between the GeoGlow App and the Nanoleafs. The API provided by Nanoleaf is accessible only locally. Therefore, each friend needs a GeoGlow Controller that is on the same network as the Nanoleafs.
+The PalPalette Controller is responsible for establishing the connection between the PalPalette App and the Nanoleafs. The API provided by Nanoleaf is accessible only locally. Therefore, each friend needs a PalPalette Controller that is on the same network as the Nanoleafs.
 
 The controller takes on several tasks:
 
@@ -59,7 +59,7 @@ The controller takes on several tasks:
 2. Ping to the Backend: A ping is sent to the backend at regular intervals to signal that the controller, and thus the friend, is reachable.
 3. Color Transmission via MQTT: The controller receives the colors sent by friends through MQTT. These are processed by the controller and forwarded to the Nanoleaf API to illuminate the panels.
 
-## Setting Up the GeoGlow Controller
+## Setting Up the PalPalette Controller
 
 _In the current phase of the project, the controllers are shipped with pre-installed code. Therefore, it is not necessary to take steps to load the code onto the controllers._
 
